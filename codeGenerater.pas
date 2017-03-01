@@ -5,7 +5,7 @@ unit codeGenerater;
 interface
 
 uses
-  Classes, SysUtils, codeParser, codeTypes;
+  Classes, SysUtils, codeParser, codeTypes, codeJNIExt;
 
 type
 
@@ -13,13 +13,14 @@ type
 
   TCodeGenerator = class
   private
+
     // cpp
-    class procedure generateCppHeader(AOutPath: string; AClassName: string; AFields: TParamMap; AMaxAraySize: Integer);
-    class procedure generateCpp(AOutPath: string; AClassName: string; APackageName: string; AConstructor: string; AConstructorParam: string; AFields: TParamMap; AFieldsFull: TParamMap);
+    class procedure generateCppHeader(AOutPath: string; AClassName: string; AFields: TParamMap; AMaxArraySize: Integer);
+    class procedure generateCpp(AOutPath: string; AClassName: string; APackageName: string; AConstructor: string; AConstructorParam: string; AFields: TParamMap; AFieldsFull: TParamMap; AMaxArraySize: Integer);
     // pas
   public
     class procedure generateDir(ALanguage: string; AMaxArraySize: Integer; AOutPath: string; AMainDir: string; AFileList: TStringList);
-    class procedure generate(ALanguage: string; AMaxArraSize: Integer; AOutPath: string; AMainFile: string; AFileList: TStringList);
+    class procedure generate(ALanguage: string; AMaxArraySize: Integer; AOutPath: string; AMainFile: string; AFileList: TStringList);
     class procedure generateMakefile(ALanguage: string; AOutPath: string; AFileList: TStringList);
     class procedure genetateShellfile(ALanguage: string; AOutPath: string);
   end;
@@ -29,7 +30,7 @@ implementation
 { TCodeGenerator }
 
 class procedure TCodeGenerator.generateCppHeader(AOutPath: string;
-  AClassName: string; AFields: TParamMap; AMaxAraySize: Integer);
+  AClassName: string; AFields: TParamMap; AMaxArraySize: Integer);
 var
   sl: TStringList;
   i: Integer;
@@ -46,10 +47,14 @@ begin
   sl.Add('#include <map>');
   sl.Add('#include <set>');
 
+  // TODO: fix include
   for i := 0 to AFields.Count - 1 do
     if (TTypeConvert.KTypeToCType(AFields.Data[i]).Contains('*')) then
-      sl.Add(Format('#include "%s.h"', [AFields.Data[i]]));
+      if (not AFields.Data[i].Contains('<')) then
+        sl.Add(Format('#include "%s.h"', [AFields.Data[i]]));
 
+  sl.Add('#include "JNIUtils.h"');
+  sl.Add('#include "JNIExt.h"');
   sl.Add('using namespace std;');
 
   // class
@@ -57,7 +62,7 @@ begin
   sl.Add('public:');
   for i := 0 to AFields.Count - 1 do begin
     if (TTypeConvert.KTypeIsArray(AFields.Data[i])) then begin
-      sl.Add(Format('    %s %s[%d];', [TTypeConvert.KTypeToCType(AFields.Data[i]), AFields.Keys[i], AMaxAraySize]));
+      sl.Add(Format('    %s %s[%d];', [TTypeConvert.KTypeToCType(AFields.Data[i]), AFields.Keys[i], AMaxArraySize]));
     end else if (TTypeConvert.KTypeIsList(AFields.Data[i])) then begin
       // list
       sl.Add(Format('    list<%s> %s;', [TTypeConvert.KTypeToCType(AFields.Data[i]), AFields.Keys[i]]));
@@ -80,11 +85,14 @@ end;
 
 class procedure TCodeGenerator.generateCpp(AOutPath: string;
   AClassName: string; APackageName: string; AConstructor: string;
-  AConstructorParam: string; AFields: TParamMap; AFieldsFull: TParamMap);
+  AConstructorParam: string; AFields: TParamMap; AFieldsFull: TParamMap;
+  AMaxArraySize: Integer);
 var
   sl: TStringList;
   i: Integer;
   callType: string;
+  sig: string;
+  mp1, mp2: string;
 begin
   sl := TStringList.Create;
   // include
@@ -104,13 +112,20 @@ begin
     callType:= TTypeConvert.KTypeToCallMethod(AFields.Data[i]);
     if (callType.Contains('Object')) then begin
       if (TTypeConvert.KTypeIsArray(AFields.Data[i])) then begin
-        // TODO: array
+        sig := TTypeConvert.KTypeToCType(AFields.Data[i]);
+        sl.Add(Format('        JNIExt::%s_jarrayToObjectArray(env, (jobjectArray)env->CallObjectMethod(obj, m), "%s", %s);', [AFields.Keys[i], sig, AFields.Keys[i]]));
+        TJNIExt.AddJArrayToObjectArray(AOutPath, AClassName, AFields.Keys[i], AFields.Data[i], AMaxArraySize);
       end else if (TTypeConvert.KTypeIsList(AFields.Data[i])) then begin
-        // TODO: list
+        sig := TTypeConvert.KTypeToCType(AFields.Data[i]);
+        sl.Add(Format('        JNIUtils::jArrayListToList(env, (jobjectArray)env->CallObjectMethod(obj, m), "%s", %s);', [sig, AFields.Keys[i]]));
       end else if (TTypeConvert.KTypeIsMap(AFields.Data[i])) then begin
-        // TODO: map
+        // map
+        TTypeConvert.KTYpeExtractMapTypes(AFields.Data[i], mp1, mp2);
+        sl.Add(Format('        JNIUtils::jHashMapToMap(env, (jobjectArray)env->CallObjectMethod(obj, m), "%s", "%s", %s);', [mp1, mp2, AFields.Keys[i]]));
       end else if (TTypeConvert.KTypeIsSet(AFields.Data[i])) then begin
-        // TODO: set
+        // set
+        sig := TTypeConvert.KTypeToCType(AFields.Data[i]);
+        sl.Add(Format('        JNIUtils::jHashSetToSet(env, (jobjectArray)env->CallObjectMethod(obj, m), "%s", %s);', [sig, AFields.Keys[i]]));
       end else begin
         if (TTypeConvert.KTypeToCType(AFields.Data[i]) = 'string') then begin
           sl.Add(Format('        ret->%s = string(env->GetStringUTFChars((jstring)env->CallObjectMethod(obj, m), NULL));', [AFields.Keys[i]]));
@@ -119,17 +134,7 @@ begin
         end;
       end;
     end else begin
-      if (TTypeConvert.KTypeIsArray(AFields.Data[i])) then begin
-        // TODO: array
-      end else if (TTypeConvert.KTypeIsList(AFields.Data[i])) then begin
-        // TODO: list
-      end else if (TTypeConvert.KTypeIsMap(AFields.Data[i])) then begin
-        // TODO: map
-      end else if (TTypeConvert.KTypeIsSet(AFields.Data[i])) then begin
-        // TODO: set
-      end else begin
-        sl.Add(Format('        ret->%s = env->%s(obj, m);', [AFields.Keys[i], callType]));
-      end;
+      sl.Add(Format('        ret->%s = env->%s(obj, m);', [AFields.Keys[i], callType]));
     end;
   end;
   sl.Add('    }');
@@ -172,7 +177,7 @@ begin
 end;
 
 class procedure TCodeGenerator.generate(ALanguage: string;
-  AMaxArraSize: Integer; AOutPath: string; AMainFile: string;
+  AMaxArraySize: Integer; AOutPath: string; AMainFile: string;
   AFileList: TStringList);
 var
   codeText: string = '';
@@ -196,11 +201,11 @@ begin
   clsConstructorParam:= TCodeParser.getConstructoreParams(codeText, clsFieldFull);
 
   if (ALanguage = 'cpp') then begin
-    generateCppHeader(AOutPath, clsName, clsFields, AMaxArraSize);
-    generateCpp(AOutPath, clsName, clsPackage, clsConstructor, clsConstructorParam, clsFields, clsFieldFull);
+    generateCppHeader(AOutPath, clsName, clsFields, AMaxArraySize);
+    generateCpp(AOutPath, clsName, clsPackage, clsConstructor, clsConstructorParam, clsFields, clsFieldFull, AMaxArraySize);
     AFileList.Add(clsName + '.cpp');
   end else if (ALanguage = 'pas') then begin
-    // TODO:
+    // TODO: pas generate
 
     AFileList.Add(clsName + '.pas');
   end;

@@ -3,7 +3,8 @@ program ndkmapping;
 {$mode objfpc}{$H+}
 
 uses
-  cthreads, Classes, sysutils, CustApp, codeGenerater, codeParser, codeTypes;
+  cthreads, Classes, sysutils, CustApp, codeGenerater, codeParser, codeTypes,
+  codeJNIExt;
 
 type
 
@@ -66,8 +67,8 @@ begin
   fileList := TStringList.Create;
   TCodeGenerator.generateDir(lng, mx, op, mainDir, fileList);
 
-  // if (bld.Contains('mk')) then TCodeGenerator.generateMakefile(lng, op, fileList);
-  // if (bld.Contains('sh')) then TCodeGenerator.genetateShellfile(lng, op);
+  if (bld.Contains('mk')) then TCodeGenerator.generateMakefile(lng, op, fileList);
+  if (bld.Contains('sh')) then TCodeGenerator.genetateShellfile(lng, op);
 
   fileList.Free;
   Terminate;

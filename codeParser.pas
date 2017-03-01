@@ -54,7 +54,6 @@ var
   r: string;
   arr: TStringArray;
   sfield: string;
-  sx: string;
   fieldarr: TStringArray;
 begin
   r := ktClassCode.Substring(ktClassCode.IndexOf('('));
@@ -112,7 +111,7 @@ var
   sx: string;
   ret: string = '';
 begin
-  // TODO: array, list, map, set
+  // array, list, map, set
   r := ktClassCode.Substring(ktClassCode.IndexOf('('));
   r := r.Trim;
   r := r.Trim(['(', ')']);
@@ -140,7 +139,6 @@ var
   sf: string;
   ret: string = '';
 begin
-  // TODO: array, list, map, set
   r := ktClassCode.Substring(ktClassCode.IndexOf('('));
   r := r.Trim;
   r := r.Trim(['(', ')']);
@@ -150,13 +148,36 @@ begin
     if (sfield.Trim <> '') then begin
       sf := sfield.Split(':')[0].Trim;
       sx := sfield.Split(':')[1].Replace('?', '', [rfIgnoreCase, rfReplaceAll]).Trim.Trim([',']);
-      sig := TTypeConvert.KTypeToCType(sx);
-      if (sig = 'string') then
-        ret += Format('env->NewStringUTF(%s.data()), ', [sf])
-      else if (sig.Contains('*')) then
-        ret += Format('%s->toJObject(env), ', [sf])
-      else
-        ret += sf + ', ';
+      if (TTypeConvert.KTypeIsArray(sx)) then begin
+        // array
+        sig := TTypeConvert.KTypeToCType(sx);
+        if (sig = 'string') then
+          ret += Format('JNIUtils::arrayToStringArray(env, %s), ', [sf])
+        else if (sig.Contains('*')) then
+          ret += Format('JNIUtils::arrayToObjectArray(env, %s), ', [sf])
+        else
+          ret += Format('JNIUtils::arrayTo%sArray(env, %s), ', [TTypeConvert.KFieldToFirstUpper(sig) ,sf]);
+      end else if (TTypeConvert.KTypeIsList(sx)) then begin
+        sig := TTypeConvert.KTypeToCType(sx);
+        // list
+        ret += Format('JNIExt::%s_listToJArrayList(env, %s), ', [sf, sf]);
+      end else if (TTypeConvert.KTypeIsMap(sx)) then begin
+        // map
+        sig := TTypeConvert.KTypeToCMapType(sx);
+        ret += Format('JNIExt::%s_mapToJHashMap(env, %s), ', [sf, sf]);
+      end else if (TTypeConvert.KTypeIsSet(sx)) then begin
+        sig := TTypeConvert.KTypeToCType(sx);
+        // set
+        ret += Format('JNIExt::%s_setToJHashSet(env, %s), ', [sf, sf]);
+      end else begin
+        sig := TTypeConvert.KTypeToCType(sx);
+        if (sig = 'string') then
+          ret += Format('env->NewStringUTF(%s.data()), ', [sf])
+        else if (sig.Contains('*')) then
+          ret += Format('%s->toJObject(env), ', [sf])
+        else
+          ret += sf + ', ';
+      end;
     end;
   end;
   ret := ret.Trim.Trim([',']);
