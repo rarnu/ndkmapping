@@ -1,0 +1,15 @@
+#fpc
+
+*.ppu
+*.o
+*.lpi
+*.lps
+lib/
+out/
+
+# mac
+
+.DS_Store
+
+#binary
+ndkmapping

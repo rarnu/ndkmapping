@@ -1,0 +1,118 @@
+program ndkmapping;
+
+{$mode objfpc}{$H+}
+
+uses
+  cthreads, Classes, sysutils, CustApp, codeGenerater, codeParser, codeTypes;
+
+type
+
+  { TNDKMappingApp }
+
+  TNDKMappingApp = class(TCustomApplication)
+  protected
+    procedure DoRun; override;
+  public
+    constructor Create(TheOwner: TComponent); override;
+    destructor Destroy; override;
+    procedure WriteHelp; virtual;
+  end;
+
+{ TNDKMappingApp }
+
+procedure TNDKMappingApp.DoRun;
+var
+  lng: string = '';  // language options
+  bld: string = '';  // build options
+  op: string = '';   // output path
+  mainDir: string = '';  // main kotlin file path
+  fileList: TStringList;
+begin
+  if (HasOption('l')) then lng := GetOptionValue('l');
+  if (HasOption('b')) then bld := GetOptionValue('b');
+  if (HasOption('o')) then op := GetOptionValue('o');
+  mainDir:= ParamStr(ParamCount);
+  if (lng = '') or (op = '') or (mainDir = '') or (not DirectoryExists(mainDir)) then begin
+    WriteHelp;
+    Terminate;
+    Exit;
+  end;
+  if (not mainDir.EndsWith('/')) then mainDir += '/';
+
+  // check options
+  if (lng <> 'cpp') and (lng <> 'pas') then begin
+    WriteHelp;
+    Terminate;
+    Exit;
+  end;
+
+  if (bld <> '') and (bld <> 'mk') and (bld <> 'mksh') then begin
+    WriteHelp;
+    Terminate;
+    Exit;
+  end;
+
+  if (not DirectoryExists(op)) then ForceDirectories(op);
+  if (not DirectoryExists(op)) then begin
+    WriteHelp;
+    Terminate;
+    Exit;
+  end;
+
+  if (not op.EndsWith('/')) then op += '/';
+
+  fileList := TStringList.Create;
+  TCodeGenerator.generateDir(lng, op, mainDir, fileList);
+
+  if (bld.Contains('mk')) then TCodeGenerator.generateMakefile(lng, op, fileList);
+  if (bld.Contains('sh')) then TCodeGenerator.genetateShellfile(lng, op);
+
+  fileList.Free;
+  Terminate;
+end;
+
+constructor TNDKMappingApp.Create(TheOwner: TComponent);
+begin
+  inherited Create(TheOwner);
+  StopOnException:= False;
+end;
+
+destructor TNDKMappingApp.Destroy;
+begin
+  inherited Destroy;
+end;
+
+procedure TNDKMappingApp.WriteHelp;
+begin
+  WriteLn('NDK Mapping v0.0');
+  WriteLn('');
+  WriteLn('usage:');
+  WriteLn('');
+  WriteLn('    ndkmapping <options> <Kotlin Class File Path>');
+  WriteLn('');
+  WriteLn('    options:');
+  WriteLn('        -l language (cpp, pas)');
+  WriteLn('        -b build option (mk, mksh)');
+  WriteLn('        -o output path');
+  WriteLn('');
+  WriteLn('sample:');
+  WriteLn('');
+  WriteLn('    ndkmapping -l cpp -b mksh ./kotlin/');
+  WriteLn('');
+end;
+
+{$IFNDEF WINDOWS}
+var
+  Application: TNDKMappingApp;
+{$ENDIF}
+begin
+  {$IFNDEF WINDOWS}
+  Application:=TNDKMappingApp.Create(nil);
+  Application.Run;
+  Application.Free;
+  {$ELSE}
+  WriteLn('NDK Mapping does NOT support Windows now.');
+  {$ENDIF}
+end.
+
+
