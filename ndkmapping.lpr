@@ -25,12 +25,14 @@ var
   lng: string = '';  // language options
   bld: string = '';  // build options
   op: string = '';   // output path
+  mx: Integer = 0;   // max array size
   mainDir: string = '';  // main kotlin file path
   fileList: TStringList;
 begin
   if (HasOption('l')) then lng := GetOptionValue('l');
   if (HasOption('b')) then bld := GetOptionValue('b');
   if (HasOption('o')) then op := GetOptionValue('o');
+  if (HasOption('m')) then mx := StrToIntDef(GetOptionValue('m'), 0);
   mainDir:= ParamStr(ParamCount);
   if (lng = '') or (op = '') or (mainDir = '') or (not DirectoryExists(mainDir)) then begin
     WriteHelp;
@@ -62,10 +64,10 @@ begin
   if (not op.EndsWith('/')) then op += '/';
 
   fileList := TStringList.Create;
-  TCodeGenerator.generateDir(lng, op, mainDir, fileList);
+  TCodeGenerator.generateDir(lng, mx, op, mainDir, fileList);
 
-  if (bld.Contains('mk')) then TCodeGenerator.generateMakefile(lng, op, fileList);
-  if (bld.Contains('sh')) then TCodeGenerator.genetateShellfile(lng, op);
+  // if (bld.Contains('mk')) then TCodeGenerator.generateMakefile(lng, op, fileList);
+  // if (bld.Contains('sh')) then TCodeGenerator.genetateShellfile(lng, op);
 
   fileList.Free;
   Terminate;
@@ -93,6 +95,7 @@ begin
   WriteLn('    options:');
   WriteLn('        -l language (cpp, pas)');
   WriteLn('        -b build option (mk, mksh)');
+  WriteLn('        -m max array size (must >= 0)');
   WriteLn('        -o output path');
   WriteLn('');
   WriteLn('sample:');

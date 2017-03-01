@@ -60,12 +60,13 @@ begin
   r := ktClassCode.Substring(ktClassCode.IndexOf('('));
   r := r.Trim;
   r := r.Trim(['(', ')']);
-  arr := r.Split([',']);
+  arr := r.Split(['var', 'val']);
   Result := TParamMap.Create;
   for sfield in arr do begin
-    sx:= sfield.Replace('var', '', [rfIgnoreCase, rfReplaceAll]).Replace('val', '', [rfIgnoreCase, rfReplaceAll]).Trim;
-    fieldarr := sx.Trim.Split(':');
-    Result.Add(fieldarr[0].Trim, fieldarr[1].Trim.Trim(['?']));
+    if (sfield.Trim <> '') then begin
+      fieldarr := sfield.Trim.Split(':');
+      Result.Add(fieldarr[0].Trim, fieldarr[1].Replace('?', '', [rfIgnoreCase, rfReplaceAll]).Trim.Trim([',']));
+    end;
   end;
 end;
 
@@ -111,15 +112,18 @@ var
   sx: string;
   ret: string = '';
 begin
+  // TODO: array, list, map, set
   r := ktClassCode.Substring(ktClassCode.IndexOf('('));
   r := r.Trim;
   r := r.Trim(['(', ')']);
-  arr := r.Split([',']);
+  arr := r.Split(['var', 'val']);
 
   for sfield in arr do begin
-    sx := sfield.Split(':')[1].Replace('?', '', [rfIgnoreCase, rfReplaceAll]).Trim;
-    sig := TTypeConvert.KTypeToSig(sx, fullMap);
-    ret += sig;
+    if (sfield.Trim <> '') then begin
+      sx := sfield.Split(':')[1].Replace('?', '', [rfIgnoreCase, rfReplaceAll]).Trim.Trim([',']);
+      sig := TTypeConvert.KTypeToSig(sx, fullMap);
+      ret += sig;
+    end;
   end;
   ret := '(' + ret + ')V';
   Exit(ret);
@@ -136,21 +140,24 @@ var
   sf: string;
   ret: string = '';
 begin
+  // TODO: array, list, map, set
   r := ktClassCode.Substring(ktClassCode.IndexOf('('));
   r := r.Trim;
   r := r.Trim(['(', ')']);
-  arr := r.Split([',']);
+  arr := r.Split(['var', 'val']);
 
   for sfield in arr do begin
-    sf := sfield.Split(':')[0].Replace('var', '', [rfIgnoreCase, rfReplaceAll]).Replace('val', '', [rfIgnoreCase, rfReplaceAll]).Trim;
-    sx := sfield.Split(':')[1].Replace('?', '', [rfIgnoreCase, rfReplaceAll]).Trim;
-    sig := TTypeConvert.KTypeToCType(sx);
-    if (sig = 'string') then
-      ret += Format('env->NewStringUTF(%s.data()), ', [sf])
-    else if (sig.Contains('*')) then
-      ret += Format('%s->toJObject(env), ', [sf])
-    else
-      ret += sf + ', ';
+    if (sfield.Trim <> '') then begin
+      sf := sfield.Split(':')[0].Trim;
+      sx := sfield.Split(':')[1].Replace('?', '', [rfIgnoreCase, rfReplaceAll]).Trim.Trim([',']);
+      sig := TTypeConvert.KTypeToCType(sx);
+      if (sig = 'string') then
+        ret += Format('env->NewStringUTF(%s.data()), ', [sf])
+      else if (sig.Contains('*')) then
+        ret += Format('%s->toJObject(env), ', [sf])
+      else
+        ret += sf + ', ';
+    end;
   end;
   ret := ret.Trim.Trim([',']);
   Exit(ret);
