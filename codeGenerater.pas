@@ -5,83 +5,28 @@ unit codeGenerater;
 interface
 
 uses
-  Classes, SysUtils, codeParser, codeTypes, codeJNIExt;
+  Classes, SysUtils;
 
 type
 
   { TCodeGenerator }
 
   TCodeGenerator = class
-  private
-
-    // cpp
-    class procedure generateCppHeader(AOutPath: string; AClassName: string; AFields: TParamMap; AMaxArraySize: Integer);
-    class procedure generateCpp(AOutPath: string; AClassName: string; APackageName: string; AConstructor: string; AConstructorParam: string; AFields: TParamMap; AFieldsFull: TParamMap; AMaxArraySize: Integer);
-    // pas
   public
-    class procedure generateDir(ALanguage: string; AMaxArraySize: Integer; AOutPath: string; AMainDir: string; AFileList: TStringList);
-    class procedure generate(ALanguage: string; AMaxArraySize: Integer; AOutPath: string; AMainFile: string; AFileList: TStringList);
-    class procedure generateMakefile(ALanguage: string; AOutPath: string; AFileList: TStringList);
+    class procedure generateDir(ALanguage: string; AMaxArraySize: Integer; AOutPath: string; AMainDir: string);
+    class procedure generate(ALanguage: string; AMaxArraySize: Integer; AOutPath: string; AMainFile: string);
+    class procedure generateMakefile(ALanguage: string; AOutPath: string);
     class procedure genetateShellfile(ALanguage: string; AOutPath: string);
   end;
 
 implementation
 
+uses
+  codeCpp, codePas;
+
 { TCodeGenerator }
 
-class procedure TCodeGenerator.generateCppHeader(AOutPath: string;
-  AClassName: string; AFields: TParamMap; AMaxArraySize: Integer);
-var
-  sl: TStringList;
-  i: Integer;
-begin
-  sl := TStringList.Create;
-
-  // include
-  sl.Add('#include <jni.h>');
-  sl.Add('#include <stdint.h>');
-  sl.Add('#include <stddef.h>');
-  sl.Add('#include <stdlib.h>');
-  sl.Add('#include <string>');
-  sl.Add('#include <list>');
-  sl.Add('#include <map>');
-  sl.Add('#include <set>');
-
-  // TODO: fix include
-  for i := 0 to AFields.Count - 1 do
-    if (TTypeConvert.KTypeToCType(AFields.Data[i]).Contains('*')) then
-      if (not AFields.Data[i].Contains('<')) then
-        sl.Add(Format('#include "%s.h"', [AFields.Data[i]]));
-
-  sl.Add('#include "JNIUtils.h"');
-  sl.Add('#include "JNIExt.h"');
-  sl.Add('using namespace std;');
-
-  // class
-  sl.Add('class ' + AClassName + ' {');
-  sl.Add('public:');
-  for i := 0 to AFields.Count - 1 do begin
-    if (TTypeConvert.KTypeIsArray(AFields.Data[i])) then begin
-      sl.Add(Format('    %s %s[%d];', [TTypeConvert.KTypeToCType(AFields.Data[i]), AFields.Keys[i], AMaxArraySize]));
-    end else if (TTypeConvert.KTypeIsList(AFields.Data[i])) then begin
-      // list
-      sl.Add(Format('    list<%s> %s;', [TTypeConvert.KTypeToCType(AFields.Data[i]), AFields.Keys[i]]));
-    end else if (TTypeConvert.KTypeIsMap(AFields.Data[i])) then begin
-      // map
-      sl.Add(Format('    map<%s> %s;', [TTypeConvert.KTypeToCMapType(AFields.Data[i]), AFields.Keys[i]]));
-    end else if (TTypeConvert.KTypeIsSet(AFields.Data[i])) then begin
-      // set
-       sl.Add(Format('    set<%s> %s;', [TTypeConvert.KTypeToCType(AFields.Data[i]), AFields.Keys[i]]));
-    end else begin
-      sl.Add(Format('    %s %s;', [TTypeConvert.KTypeToCType(AFields.Data[i]), AFields.Keys[i]]));
-    end;
-  end;
-  sl.Add('    static ' + AClassName + '* fromJObject(JNIEnv *env, jobject obj);');
-  sl.Add('    jobject toJObject(JNIEnv *env);');
-  sl.Add('};');
-  sl.SaveToFile(AOutPath + AClassName + '.h');
-  sl.Free;
-end;
+(*
 
 class procedure TCodeGenerator.generateCpp(AOutPath: string;
   AClassName: string; APackageName: string; AConstructor: string;
@@ -94,9 +39,7 @@ var
   sig: string;
   mp1, mp2: string;
 begin
-  sl := TStringList.Create;
-  // include
-  sl.Add('#include "' + AClassName + '.h"');
+
   // from jobject
   sl.Add(Format('%s* %s::fromJObject(JNIEnv *env, jobject obj) {', [AClassName, AClassName]));
   sl.Add(Format('    %s *ret = NULL;', [AClassName]));
@@ -113,19 +56,22 @@ begin
     if (callType.Contains('Object')) then begin
       if (TTypeConvert.KTypeIsArray(AFields.Data[i])) then begin
         sig := TTypeConvert.KTypeToCType(AFields.Data[i]);
-        sl.Add(Format('        JNIExt::%s_jarrayToObjectArray(env, (jobjectArray)env->CallObjectMethod(obj, m), "%s", %s);', [AFields.Keys[i], sig, AFields.Keys[i]]));
+        sl.Add(Format('        JNIExt::%s_jarrayToObjectArray(env, (jobjectArray)env->CallObjectMethod(obj, m), %s);', [AFields.Keys[i], AFields.Keys[i]]));
         TJNIExt.AddJArrayToObjectArray(AOutPath, AClassName, AFields.Keys[i], AFields.Data[i], AMaxArraySize);
       end else if (TTypeConvert.KTypeIsList(AFields.Data[i])) then begin
         sig := TTypeConvert.KTypeToCType(AFields.Data[i]);
-        sl.Add(Format('        JNIUtils::jArrayListToList(env, (jobjectArray)env->CallObjectMethod(obj, m), "%s", %s);', [sig, AFields.Keys[i]]));
+        sl.Add(Format('        JNIExt::%s_jArrayListToList(env, (jobjectArray)env->CallObjectMethod(obj, m), %s);', [AFields.Keys[i], AFields.Keys[i]]));
+        TJNIExt.AddJArrayListToList(AOutPath, AClassName, AFields.Keys[i], AFields.Data[i]);
       end else if (TTypeConvert.KTypeIsMap(AFields.Data[i])) then begin
         // map
         TTypeConvert.KTYpeExtractMapTypes(AFields.Data[i], mp1, mp2);
-        sl.Add(Format('        JNIUtils::jHashMapToMap(env, (jobjectArray)env->CallObjectMethod(obj, m), "%s", "%s", %s);', [mp1, mp2, AFields.Keys[i]]));
+        sl.Add(Format('        JNIExt::%s_jHashMapToMap(env, (jobjectArray)env->CallObjectMethod(obj, m) %s);', [AFields.Keys[i], AFields.Keys[i]]));
+        TJNIExt.AddJHashMapToMap(AOutPath, AClassName, AFields.Keys[i], AFields.Data[i]);
       end else if (TTypeConvert.KTypeIsSet(AFields.Data[i])) then begin
         // set
         sig := TTypeConvert.KTypeToCType(AFields.Data[i]);
-        sl.Add(Format('        JNIUtils::jHashSetToSet(env, (jobjectArray)env->CallObjectMethod(obj, m), "%s", %s);', [sig, AFields.Keys[i]]));
+        sl.Add(Format('        JNIExt::%s_jHashSetToSet(env, (jobjectArray)env->CallObjectMethod(obj, m), %s);', [AFields.Keys[i], AFields.Keys[i]]));
+        TJNIExt.AddJHashsetToSet(AOutPath, AClassName, AFields.Keys[i], AFields.Data[i]);
       end else begin
         if (TTypeConvert.KTypeToCType(AFields.Data[i]) = 'string') then begin
           sl.Add(Format('        ret->%s = string(env->GetStringUTFChars((jstring)env->CallObjectMethod(obj, m), NULL));', [AFields.Keys[i]]));
@@ -154,10 +100,10 @@ begin
   sl.SaveToFile(AOutPath + AClassName + '.cpp');
   sl.Free;
 end;
+*)
 
 class procedure TCodeGenerator.generateDir(ALanguage: string;
-  AMaxArraySize: Integer; AOutPath: string; AMainDir: string;
-  AFileList: TStringList);
+  AMaxArraySize: Integer; AOutPath: string; AMainDir: string);
 var
   src: TSearchRec;
   p: string;
@@ -168,57 +114,29 @@ begin
       if (src.Name = '.') or (src.Name = '..') then Continue;
       p := AMainDir + src.Name;
       if (DirectoryExists(p)) then
-        generateDir(ALanguage, AMaxArraySize, AOutPath, p, AFileList)
+        generateDir(ALanguage, AMaxArraySize, AOutPath, p)
       else
-        generate(ALanguage, AMaxArraySize, AOutPath, p, AFileList);
+        generate(ALanguage, AMaxArraySize, AOutPath, p);
     until FindNext(src) <> 0;
     FindClose(src);
   end;
 end;
 
 class procedure TCodeGenerator.generate(ALanguage: string;
-  AMaxArraySize: Integer; AOutPath: string; AMainFile: string;
-  AFileList: TStringList);
-var
-  codeText: string = '';
-  clsName: string = '';
-  clsPackage: string = '';
-  clsFields: TParamMap = nil;
-  clsFieldFull: TParamMap = nil;
-  clsConstructor: string = '';
-  clsConstructorParam: string = '';
+  AMaxArraySize: Integer; AOutPath: string; AMainFile: string);
 begin
-  with TStringList.Create do begin
-    LoadFromFile(AMainFile);
-    codeText:= Text;
-    Free;
-  end;
-  clsName := TCodeParser.getClassName(codeText);
-  clsPackage:= TCodeParser.getPackageName(codeText);
-  clsFields := TCodeParser.getFields(codeText);
-  clsFieldFull := TCodeParser.getFieldsFullPath(codeText, clsFields, clsPackage, ExtractFilePath(AMainFile));
-  clsConstructor:= TCodeParser.getConstructoreSig(codeText, clsFieldFull);
-  clsConstructorParam:= TCodeParser.getConstructoreParams(codeText, clsFieldFull);
-
   if (ALanguage = 'cpp') then begin
-    generateCppHeader(AOutPath, clsName, clsFields, AMaxArraySize);
-    generateCpp(AOutPath, clsName, clsPackage, clsConstructor, clsConstructorParam, clsFields, clsFieldFull, AMaxArraySize);
-    AFileList.Add(clsName + '.cpp');
+    TCodeCpp.generate(AOutPath, AMainFile, AMaxArraySize);
   end else if (ALanguage = 'pas') then begin
-    // TODO: pas generate
-
-    AFileList.Add(clsName + '.pas');
+    TCodePas.generate(AOutPath, AMainFile, AMaxArraySize);
   end;
-
-  if (clsFields <> nil) then clsFields.Free;
-  if (clsFieldFull <> nil) then clsFieldFull.Free;
 end;
 
 class procedure TCodeGenerator.generateMakefile(ALanguage: string;
-  AOutPath: string; AFileList: TStringList);
+  AOutPath: string);
 var
   sl: TStringList;
-  i: Integer;
+  src: TSearchRec;
 begin
   if (ALanguage = 'cpp') then begin
 
@@ -226,16 +144,26 @@ begin
     sl := TStringList.Create;
     sl.Add('LOCAL_PATH := $(call my-dir)');
     sl.Add('include $(CLEAR_VARS)');
+    sl.Add('');
     sl.Add('LOCAL_CPPFLAGS := -std=c++11 -fexceptions');
     sl.Add('LOCAL_MODULE    := ndkmapping_generated');
+    sl.Add('');
     sl.Add('LOCAL_SRC_FILES := \');
-    for i := 0 to AFileList.Count - 1 do sl.Add(Format('        %s \', [AFileList[i]]));
+
+    if (FindFirst(AOutPath + '*.cpp', faAnyFile, src) = 0) then begin
+      repeat
+        if (src.Name = '.') or (src.Name = '..') then Continue;
+        sl.Add(Format('        %s \', [src.Name]));
+      until FindNext(src) <> 0;
+      FindClose(src);
+    end;
     sl.Add('');
     sl.Add('LOCAL_C_INCLUDES := \');
     sl.Add('        $(LOCAL_PATH) \');
-    sl.Add('        $(LOCAL_PATH)/classes \');
+    sl.Add('');
     sl.Add('LOCAL_CFLAGS += -D_PLATFORM_ANDROID');
     sl.Add('LOCAL_LDLIBS := -llog -landroid');
+    sl.Add('');
     sl.Add('include $(BUILD_SHARED_LIBRARY)');
     sl.SaveToFile(AOutPath + 'Android.mk');
     sl.Free;

@@ -8,9 +8,7 @@ jcharArray arrayToCharArray(JNIEnv *env, char arr[]);
 jshortArray arrayToShortArray(JNIEnv *env, short arr[]);
 jlongArray arrayToLongArray(JNIEnv *env, long long arr[]);
 jfloatArray arrayToFloatArray(JNIEnv *env, float arr[]);
-jobjectArray arrayToObjectArray(JNIEnv *env, void* arr[]);
 jobjectArray arrayToStringArray(JNIEnv *env, string arr[]);
+jobjectArray arrayToObjectArray(JNIEnv *env, void* arr[]);
 
-void jArrayListToList(JNIEnv *env, jobject l, string type, list<string> &lst);
-void jHashMapToMap(JNIEnv *env, jobject l, string type1, string type2, map<int, string> &m);
-void jHashSetToSet(JNIEnv *env, jobject l, string type, set<string> &s);
+

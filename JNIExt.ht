@@ -1,6 +1,11 @@
 JNIExt.h (generated)
 
 void <sf>_jarrayToObjectArray(JNIEnv *env, jobjectArray arr, string type, <sx> (&dest)[SIZE]);
+void <sf>_jArrayListToList(JNIEnv *env, jobject l, string type, list<<sx>> &lst);
+void <sf>_jHashMapToMap(JNIEnv *env, jobject l, string type1, string type2, map<<sx1>, <sx2>> &m);
+void <sf>_jHashSetToSet(JNIEnv *env, jobject l, string type, set<<sx>> &s);
+
+
 jobject <sf>_listToJArrayList(JNIEnv *env, list<type> l);
 jobject <sf>_mapToJHashMap(JNIEnv *env, map<type1, type2> m);
 jobject <sf>_setToJHashSet(JNIEnv *env, set<type> s);

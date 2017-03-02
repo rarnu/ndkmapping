@@ -5,10 +5,53 @@ unit codeTypes;
 interface
 
 uses
-  Classes, SysUtils, fgl;
+  Classes, SysUtils, fgl, strutils;
 
 type
-  TParamMap = specialize TFPGMap<String, String>;
+  TFieldTypeCategory = (ftcSimple, ftcString, ftcObject);
+
+  { TFieldType }
+
+  TFieldType = class
+  public
+    fieldType: string;
+    fieldSignature: string;
+    fieldPackageName: string;
+    fieldFullPackageName: string;
+    fieldCategory: TFieldTypeCategory;
+    function ToString: ansistring; override;
+  end;
+
+  { TFieldInfo }
+
+  TFieldInfo = class
+  public
+    fieldName: string;
+    isArray: Boolean;
+    isList: Boolean;
+    isMap: Boolean;
+    isSet: Boolean;
+    baseType: TFieldType;
+    genericType1: TFieldType;
+    genericType2: TFieldType;
+    destructor Destroy; override;
+    function ToString: ansistring; override;
+  end;
+
+  TFieldList = specialize TFPGList<TFieldInfo>;
+
+  { TClassInfo }
+
+  TClassInfo = class
+  public
+    ktClassName: string;
+    packageName: string;
+    fullPackageName: string;
+    constructorSig: string;
+    fieldList: TFieldList;
+    destructor Destroy; override;
+    function ToString: ansistring; override;
+  end;
 
 type
 
@@ -16,24 +59,99 @@ type
 
   TTypeConvert = class
   public
+    // kotlin
     class function KTypeIsArray(AType: string): Boolean;
     class function KTypeIsList(AType: string): Boolean;
     class function KTypeIsMap(AType: string): Boolean;
     class function KTypeIsSet(AType: string): Boolean;
+    class function KTypeToSimpleKType(AType: string): string;
+    class procedure KTypeExtractMapKTypes(AType: string; out p1: string; out p2: string);
+
+    // cpp
     class function KTypeToCType(AType: string): string;
     class function KTypeToCMapType(AType: string): string;
-    class procedure KTYpeExtractMapTypes(AType: string; out p1: string; out p2: string);
+    class procedure KTypeExtractCMapTypes(AType: string; out p1: string; out p2: string);
     class function KTypeToPType(AType: string): string;
     class function KTypeToCallMethod(AType: string): string;
-    class function KTypeToGetSig(AType: string; AFullFields: TParamMap): string;
-    class function KTypeToSetSig(AType: string; AFullFields: TParamMap): string;
-    class function KTypeToSig(AType: string; AFullFields: TParamMap): string;
+    //class function KTypeToGetSig(AType: string; AFullFields: TParamMap): string;
+    //class function KTypeToSetSig(AType: string; AFullFields: TParamMap): string;
+    //class function KTypeToSig(AType: string; AFullFields: TParamMap): string;
     class function KFieldToGetName(AField: string): string;
     class function KFieldToSetName(AField: string): string;
     class function KFieldToFirstUpper(AField: string): string;
   end;
 
 implementation
+
+{ TFieldType }
+
+function TFieldType.ToString: ansistring;
+var
+  catStr: string;
+begin
+  case fieldCategory of
+  ftcString: catStr:= 'String';
+  ftcObject: catStr:= 'Object';
+  else
+    catStr:= 'Simple';
+  end;
+  Result:= Format('    type: %s'#13#10'    sig: %s'#13#10'    pkg: %s'#13#10'    fullPkg: %s'#13#10'    category: %s'#13#10, [
+    fieldType, fieldSignature, fieldPackageName, fieldFullPackageName, catStr
+  ]);
+end;
+
+{ TFieldInfo }
+
+destructor TFieldInfo.Destroy;
+begin
+  if (baseType <> nil) then baseType.Free;
+  if (genericType1 <> nil) then genericType1.Free;
+  if (genericType2 <> nil) then genericType2.Free;
+  inherited Destroy;
+end;
+
+function TFieldInfo.ToString: ansistring;
+var
+  bstr: string = '';
+  gstr1: string = '';
+  gstr2: string = '';
+begin
+  if (baseType <> nil) then bstr:= baseType.ToString;
+  if (genericType1 <> nil) then gstr1:= genericType1.ToString;
+  if (genericType2 <> nil) then gstr2:= genericType2.ToString;
+  Result := Format('  name: %s'#13#10'  array: %s'#13#10'  list: %s'#13#10'  map: %s'#13#10'  set: %s'#13#10'  base: '#13#10'%s'#13#10'  generic1:'#13#10'%s'#13#10'  generic2:'#13#10'%s'#13#10, [
+    fieldName, IfThen(isArray, 'TRUE', 'FALSE'), IfThen(isList, 'TRUE', 'FALSE'), IfThen(isMap, 'TRUE', 'FALSE'), IfThen(isSet, 'TRUE', 'FALSE'),
+    bstr, gstr1, gstr2]);
+end;
+
+{ TClassInfo }
+
+destructor TClassInfo.Destroy;
+var
+  i: Integer;
+begin
+  if (fieldList <> nil) then begin
+    for i := fieldList.Count -1 downto 0 do begin
+      fieldList[i].Free;
+    end;
+    fieldList.Free;
+  end;
+  inherited Destroy;
+end;
+
+function TClassInfo.ToString: ansistring;
+var
+  i: Integer;
+  s: string = '';
+begin
+  // to string
+  for i := 0 to fieldList.Count - 1 do begin
+    s += fieldList[i].ToString;
+  end;
+  Result := Format('ClassName: %s'#13#10'Package: %s'#13#10'Full Package: %s'#13#10'Fields:'#13#10'%s'#13#10'constructor: %s'#13#10, [
+  ktClassName, packageName, fullPackageName, s, constructorSig
+  ]);
+end;
 
 { TTypeConvert }
 
@@ -55,6 +173,23 @@ end;
 class function TTypeConvert.KTypeIsSet(AType: string): Boolean;
 begin
   Result := AType.Contains('Set<');
+end;
+
+class function TTypeConvert.KTypeToSimpleKType(AType: string): string;
+begin
+  AType:= AType.Substring(AType.IndexOf('<')).Trim.Trim(['<', '>']);
+  Exit(AType.Trim)
+end;
+
+class procedure TTypeConvert.KTypeExtractMapKTypes(AType: string; out
+  p1: string; out p2: string);
+var
+  arr: TStringArray;
+begin
+  AType:= AType.Substring(AType.IndexOf('<')).Trim.Trim(['<', '>']);
+  arr := AType.Split([',']);
+  p1 := arr[0].Trim;
+  p2 := arr[1].Trim;
 end;
 
 class function TTypeConvert.KTypeToCType(AType: string): string;
@@ -96,7 +231,7 @@ begin
   Exit(Format('%s, %s', [p1, p2]));
 end;
 
-class procedure TTypeConvert.KTYpeExtractMapTypes(AType: string; out
+class procedure TTypeConvert.KTypeExtractCMapTypes(AType: string; out
   p1: string; out p2: string);
 var
   arr: TStringArray;
@@ -140,6 +275,7 @@ begin
   Exit(r);
 end;
 
+(*
 class function TTypeConvert.KTypeToGetSig(AType: string; AFullFields: TParamMap
   ): string;
 const
@@ -355,6 +491,8 @@ begin
   end;
   Exit(r);
 end;
+
+*)
 
 class function TTypeConvert.KFieldToGetName(AField: string): string;
 begin

@@ -12,18 +12,37 @@ type
   { TCodeParser }
 
   TCodeParser = class
-  public
+  private
     class function getClassName(ktClassCode: string): string;
     class function getPackageName(ktClassCode: string): string;
-    class function getFields(ktClassCode: string): TParamMap;
-    class function getFieldsFullPath(ktClassCode: string; oriMap: TParamMap; oriPkg: string; oriPath: string): TParamMap;
-    class function getConstructoreSig(ktClassCode: string; fullMap: TParamMap): string;
-    class function getConstructoreParams(ktClassCode: string; fullMap: TParamMap): string;
+    class function getFields(APkgName: string; ktClassCode: string; ABasePath: string): TFieldList;
+    class function getFieldInfo(APkgName: string; AFieldName: string; AFieldType: string; ABasePath: string; ktClassCode: string): TFieldInfo;
+    class function getConstructorSig(AFieldList: TFieldList): string;
+    class function typeToSig(AFullPackageName: string): string;
+    class function typeToFullPackageName(AType: string; ABasePath: string; ktClassCode: string; APkgName: string): string;
+    class function typeExtractPackageName(AFullPackageName: string): string;
+    class function typeToCategory(AType: string): TFieldTypeCategory;
+  public
+    class function getClassInfo(ktClassCode: string; ABasePath: string): TClassInfo;
+
   end;
 
 implementation
 
 { TCodeParser }
+
+class function TCodeParser.getClassInfo(ktClassCode: string; ABasePath: string
+  ): TClassInfo;
+begin
+  Result := TClassInfo.Create;
+  with Result do begin
+    ktClassName:= getClassName(ktClassCode);
+    packageName:= getPackageName(ktClassCode);
+    fullPackageName := Format('%s.%s', [packageName, ktClassName]);
+    fieldList := getFields(packageName, ktClassCode, ABasePath);
+    constructorSig:= getConstructorSig(fieldList);
+  end;
+end;
 
 class function TCodeParser.getClassName(ktClassCode: string): string;
 const
@@ -49,139 +68,228 @@ begin
   Exit(r);
 end;
 
-class function TCodeParser.getFields(ktClassCode: string): TParamMap;
+class function TCodeParser.getFields(APkgName: string; ktClassCode: string;
+  ABasePath: string): TFieldList;
+
 var
   r: string;
   arr: TStringArray;
   sfield: string;
   fieldarr: TStringArray;
+  info: TFieldInfo;
 begin
+  Result := TFieldList.Create;
   r := ktClassCode.Substring(ktClassCode.IndexOf('('));
   r := r.Trim;
   r := r.Trim(['(', ')']);
   arr := r.Split(['var', 'val']);
-  Result := TParamMap.Create;
   for sfield in arr do begin
     if (sfield.Trim <> '') then begin
       fieldarr := sfield.Trim.Split(':');
-      Result.Add(fieldarr[0].Trim, fieldarr[1].Replace('?', '', [rfIgnoreCase, rfReplaceAll]).Trim.Trim([',']));
+      info := getFieldInfo(APkgName, fieldarr[0].Trim, fieldarr[1].Replace('?', '', [rfIgnoreCase, rfReplaceAll]).Trim.Trim([',']), ABasePath, ktClassCode);
+      if (info <> nil) then Result.Add(info);
     end;
   end;
 end;
 
-class function TCodeParser.getFieldsFullPath(ktClassCode: string;
-  oriMap: TParamMap; oriPkg: string; oriPath: string): TParamMap;
+class function TCodeParser.getFieldInfo(APkgName: string; AFieldName: string;
+  AFieldType: string; ABasePath: string; ktClassCode: string): TFieldInfo;
 var
-  importList: TStringList;
-  codeList: TStringList;
-  i, j: Integer;
-  src: TSearchRec;
+  mp1, mp2: string;
 begin
-  Result := TParamMap.Create;
+  Result := TFieldInfo.Create;
+  with Result do begin
+    fieldName:= AFieldName;
+    isArray:= TTypeConvert.KTypeIsArray(AFieldType);
+    isList:= TTypeConvert.KTypeIsList(AFieldType);
+    isMap:= TTypeConvert.KTypeIsMap(AFieldType);
+    isSet:= TTypeConvert.KTypeIsSet(AFieldType);
+    if (isList) then begin
+      // list
+      baseType := TFieldType.Create;
+      baseType.fieldType:= 'ArrayList';
+      baseType.fieldFullPackageName:= 'java.util.ArrayList';
+      baseType.fieldPackageName:= 'java.util';
+      baseType.fieldSignature:= 'Ljava/util/ArrayList;';
+      baseType.fieldCategory:= ftcObject;
+      // generic
+      genericType1 := TFieldType.Create;
+      genericType1.fieldType:= TTypeConvert.KTypeToSimpleKType(AFieldType);
+      genericType1.fieldFullPackageName:= typeToFullPackageName(TTypeConvert.KTypeToSimpleKType(AFieldType), ABasePath, ktClassCode, APkgName);
+      genericType1.fieldPackageName:= typeExtractPackageName(genericType1.fieldFullPackageName);
+      genericType1.fieldSignature:= typeToSig(genericType1.fieldFullPackageName);
+      genericType1.fieldCategory:= typeToCategory(TTypeConvert.KTypeToSimpleKType(AFieldType));
+    end else if (isMap) then begin
+      // map
+      baseType := TFieldType.Create;
+      baseType.fieldType:= 'HashMap';
+      baseType.fieldFullPackageName:= 'java.util.HashMap';
+      baseType.fieldPackageName:= 'java.util';
+      baseType.fieldSignature:= 'Ljava/util/HashMap;';
+      baseType.fieldCategory:= ftcObject;
+
+      TTypeConvert.KTypeExtractMapKTypes(AFieldType, mp1, mp2);
+      genericType1 := TFieldType.Create;
+      genericType1.fieldType:= TTypeConvert.KTypeToSimpleKType(mp1);
+      genericType1.fieldFullPackageName:= typeToFullPackageName(TTypeConvert.KTypeToSimpleKType(mp1), ABasePath, ktClassCode, APkgName);
+      genericType1.fieldPackageName:= typeExtractPackageName(genericType1.fieldFullPackageName);
+      genericType1.fieldSignature:= typeToSig(genericType1.fieldFullPackageName);
+      genericType1.fieldCategory:= typeToCategory(TTypeConvert.KTypeToSimpleKType(mp1));
+
+      genericType2 := TFieldType.Create;
+      genericType2.fieldType:= TTypeConvert.KTypeToSimpleKType(mp2);
+      genericType2.fieldFullPackageName:= typeToFullPackageName(TTypeConvert.KTypeToSimpleKType(mp2), ABasePath, ktClassCode, APkgName);
+      genericType2.fieldPackageName:= typeExtractPackageName(genericType2.fieldFullPackageName);
+      genericType2.fieldSignature:= typeToSig(genericType2.fieldFullPackageName);
+      genericType2.fieldCategory:= typeToCategory(TTypeConvert.KTypeToSimpleKType(mp2));
+
+
+    end else if (isSet) then begin
+      // set
+      baseType := TFieldType.Create;
+      baseType.fieldType:= 'HashSet';
+      baseType.fieldFullPackageName:= 'java.util.HashSet';
+      baseType.fieldPackageName:= 'java.util';
+      baseType.fieldSignature:= 'Ljava/util/HashSet;';
+      baseType.fieldCategory:= ftcObject;
+      // generic
+      genericType1 := TFieldType.Create;
+      genericType1.fieldType:= TTypeConvert.KTypeToSimpleKType(AFieldType);
+      genericType1.fieldFullPackageName:= typeToFullPackageName(TTypeConvert.KTypeToSimpleKType(AFieldType), ABasePath, ktClassCode, APkgName);
+      genericType1.fieldPackageName:= typeExtractPackageName(genericType1.fieldFullPackageName);
+      genericType1.fieldSignature:= typeToSig(genericType1.fieldFullPackageName);
+      genericType1.fieldCategory:= typeToCategory(TTypeConvert.KTypeToSimpleKType(AFieldType));
+    end else if (isArray) then begin
+      // array
+      baseType := TFieldType.Create;
+      baseType.fieldType:= TTypeConvert.KTypeToSimpleKType(AFieldType);
+      baseType.fieldFullPackageName:= typeToFullPackageName(TTypeConvert.KTypeToSimpleKType(AFieldType), ABasePath, ktClassCode, APkgName);
+      baseType.fieldPackageName:= typeExtractPackageName(baseType.fieldFullPackageName);
+      baseType.fieldSignature:= '[' + typeToSig(baseType.fieldFullPackageName);
+      baseType.fieldCategory:= typeToCategory(TTypeConvert.KTypeToSimpleKType(AFieldType));
+    end else begin
+      baseType := TFieldType.Create;
+      baseType.fieldType:= TTypeConvert.KTypeToSimpleKType(AFieldType);
+      baseType.fieldFullPackageName:= typeToFullPackageName(TTypeConvert.KTypeToSimpleKType(AFieldType), ABasePath, ktClassCode, APkgName);
+      baseType.fieldPackageName:= typeExtractPackageName(baseType.fieldFullPackageName);
+      baseType.fieldSignature:= typeToSig(baseType.fieldFullPackageName);
+      baseType.fieldCategory:= typeToCategory(AFieldType);
+    end;
+  end;
+end;
+
+class function TCodeParser.getConstructorSig(AFieldList: TFieldList): string;
+var
+  r: string = '';
+  i: Integer;
+begin
+  for i := 0 to AFieldList.Count - 1 do begin
+    r += AFieldList[i].baseType.fieldSignature;
+  end;
+  Exit(Format('(%s)V', [r]));
+end;
+
+class function TCodeParser.typeToSig(AFullPackageName: string): string;
+const
+  SIMPLE_TYPE: array[0..7] of string = ('Int', 'Double', 'Float', 'Short', 'Long', 'Boolean', 'Byte', 'Char');
+  SIMPLE_SIG: array[0..7] of string = ('I', 'D', 'F', 'S', 'J', 'Z', 'B', 'C');
+var
+  i: Integer;
+begin
+  for i := 0 to Length(SIMPLE_TYPE) - 1 do begin
+    if (SIMPLE_TYPE[i] = AFullPackageName) then Exit(SIMPLE_SIG[i]);
+  end;
+  Exit(Format('L%s;', [AFullPackageName.Replace('.', '/', [rfIgnoreCase, rfReplaceAll])]));
+end;
+
+class function TCodeParser.typeToFullPackageName(AType: string;
+  ABasePath: string; ktClassCode: string; APkgName: string): string;
+const
+  SIMPLE_TYPE: array[0..7] of string = ('Int', 'Double', 'Float', 'Short', 'Long', 'Boolean', 'Byte', 'Char');
+var
+  src: TSearchRec;
+  r: string;
+  st: string;
+  isSimple: Boolean = False;
+  isImport: Boolean = False;
+  isPath: Boolean = False;
+  codeList: TStringList;
+  i: Integer;
+  simport: string;
+begin
+  for st in SIMPLE_TYPE do begin
+    if (st = AType) then begin
+      isSimple:= True;
+      Break;
+    end;
+  end;
+  if (isSimple) then Exit(AType);
+
   codeList := TStringList.Create;
   codeList.Text:= ktClassCode;
+  for i := 0 to codeList.Count - 1 do begin
+    if (codeList[i].Trim.StartsWith('import ')) then begin
+      simport:= codeList[i].Trim;
+      if (simport.EndsWith('.' + AType)) then begin
+        isImport:= True;
+        r := simport.Replace('import', '', []).Trim;
+        Break;
+      end;
 
-  importList := TStringList.Create;
-  for i := 0 to codeList.Count - 1 do if (codeList[i].Trim.StartsWith('import ')) then importList.Add(codeList[i].Trim);
-  if (not oriPath.EndsWith('/')) then oriPath += '/';
-  if (oriPath = '/') then oriPath:= './';
-  if (FindFirst(oriPath + '*.kt', faAnyFile, src) = 0) then begin
+    end;
+  end;
+  codeList.Free;
+  if (isImport) then Exit(r);
+
+  if (FindFirst(ABasePath + '*.kt', faAnyFile, src) = 0) then begin
     repeat
       if (src.Name = '.') or (src.Name = '..') then Continue;
-      importList.Add(Format('import %s.%s', [oriPkg, string(src.Name).Replace('.kt', '', [rfIgnoreCase, rfReplaceAll])]));
+      if (src.Name = AType + '.kt') then begin
+        isPath:= True;
+        r := APkgName + '.' + src.Name;
+        if (r.EndsWith('.kt')) then r := r.Substring(0, r.Length - 3);
+        Break;
+      end;
     until FindNext(src) <> 0;
     FindClose(src);
   end;
 
-  for i := 0 to oriMap.Count - 1 do
-    for j := 0 to importList.Count - 1 do
-      if (importList[j].Trim.EndsWith('.' + oriMap.Data[i])) then
-        Result.Add(oriMap.Data[i], importList[j].Trim.Replace('import', '', [rfIgnoreCase, rfReplaceAll]).Trim);
+  if (isPath) then Exit(r);
 
-  importList.Free;
-  codeList.Free;
+  r := 'java.lang.' + AType;
+  Exit(r);
+
 end;
 
-class function TCodeParser.getConstructoreSig(ktClassCode: string; fullMap: TParamMap): string;
+class function TCodeParser.typeExtractPackageName(AFullPackageName: string
+  ): string;
 var
-  sig: string = '';
   r: string;
-  arr: TStringArray;
-  sfield: string;
-  sx: string;
-  ret: string = '';
 begin
-  // array, list, map, set
-  r := ktClassCode.Substring(ktClassCode.IndexOf('('));
-  r := r.Trim;
-  r := r.Trim(['(', ')']);
-  arr := r.Split(['var', 'val']);
-
-  for sfield in arr do begin
-    if (sfield.Trim <> '') then begin
-      sx := sfield.Split(':')[1].Replace('?', '', [rfIgnoreCase, rfReplaceAll]).Trim.Trim([',']);
-      sig := TTypeConvert.KTypeToSig(sx, fullMap);
-      ret += sig;
-    end;
+  if (AFullPackageName.Contains('.')) then begin
+    r := AFullPackageName.Substring(0, AFullPackageName.LastIndexOf('.'));
+  end else begin
+    r := AFullPackageName;
   end;
-  ret := '(' + ret + ')V';
-  Exit(ret);
+  Exit(r);
 end;
 
-class function TCodeParser.getConstructoreParams(ktClassCode: string;
-  fullMap: TParamMap): string;
+class function TCodeParser.typeToCategory(AType: string): TFieldTypeCategory;
+const
+  SIMPLE_TYPE: array[0..7] of string = ('Int', 'Double', 'Float', 'Short', 'Long', 'Boolean', 'Byte', 'Char');
 var
-  sig: string = '';
-  r: string;
-  arr: TStringArray;
-  sfield: string;
-  sx: string;
-  sf: string;
-  ret: string = '';
+  st: string;
+  isSimple: Boolean = False;
 begin
-  r := ktClassCode.Substring(ktClassCode.IndexOf('('));
-  r := r.Trim;
-  r := r.Trim(['(', ')']);
-  arr := r.Split(['var', 'val']);
-
-  for sfield in arr do begin
-    if (sfield.Trim <> '') then begin
-      sf := sfield.Split(':')[0].Trim;
-      sx := sfield.Split(':')[1].Replace('?', '', [rfIgnoreCase, rfReplaceAll]).Trim.Trim([',']);
-      if (TTypeConvert.KTypeIsArray(sx)) then begin
-        // array
-        sig := TTypeConvert.KTypeToCType(sx);
-        if (sig = 'string') then
-          ret += Format('JNIUtils::arrayToStringArray(env, %s), ', [sf])
-        else if (sig.Contains('*')) then
-          ret += Format('JNIUtils::arrayToObjectArray(env, %s), ', [sf])
-        else
-          ret += Format('JNIUtils::arrayTo%sArray(env, %s), ', [TTypeConvert.KFieldToFirstUpper(sig) ,sf]);
-      end else if (TTypeConvert.KTypeIsList(sx)) then begin
-        sig := TTypeConvert.KTypeToCType(sx);
-        // list
-        ret += Format('JNIExt::%s_listToJArrayList(env, %s), ', [sf, sf]);
-      end else if (TTypeConvert.KTypeIsMap(sx)) then begin
-        // map
-        sig := TTypeConvert.KTypeToCMapType(sx);
-        ret += Format('JNIExt::%s_mapToJHashMap(env, %s), ', [sf, sf]);
-      end else if (TTypeConvert.KTypeIsSet(sx)) then begin
-        sig := TTypeConvert.KTypeToCType(sx);
-        // set
-        ret += Format('JNIExt::%s_setToJHashSet(env, %s), ', [sf, sf]);
-      end else begin
-        sig := TTypeConvert.KTypeToCType(sx);
-        if (sig = 'string') then
-          ret += Format('env->NewStringUTF(%s.data()), ', [sf])
-        else if (sig.Contains('*')) then
-          ret += Format('%s->toJObject(env), ', [sf])
-        else
-          ret += sf + ', ';
-      end;
+  for st in SIMPLE_TYPE do begin
+    if (st = AType) then begin
+      isSimple:= True;
+      Break;
     end;
   end;
-  ret := ret.Trim.Trim([',']);
-  Exit(ret);
+  if (isSimple) then Exit(ftcSimple);
+  if (AType = 'String') then Exit(ftcString);
+  Exit(ftcObject);
 end;
 
 end.

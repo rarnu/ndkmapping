@@ -4,7 +4,7 @@ program ndkmapping;
 
 uses
   cthreads, Classes, sysutils, CustApp, codeGenerater, codeParser, codeTypes,
-  codeJNIExt;
+  codeCpp, codePas;
 
 type
 
@@ -65,9 +65,9 @@ begin
   if (not op.EndsWith('/')) then op += '/';
 
   fileList := TStringList.Create;
-  TCodeGenerator.generateDir(lng, mx, op, mainDir, fileList);
+  TCodeGenerator.generateDir(lng, mx, op, mainDir);
 
-  if (bld.Contains('mk')) then TCodeGenerator.generateMakefile(lng, op, fileList);
+  if (bld.Contains('mk')) then TCodeGenerator.generateMakefile(lng, op);
   if (bld.Contains('sh')) then TCodeGenerator.genetateShellfile(lng, op);
 
   fileList.Free;
