@@ -39,6 +39,7 @@ type
   end;
 
   TFieldList = specialize TFPGList<TFieldInfo>;
+  TFieldMap = specialize TFPGMap<string, TFieldInfo>;
 
   { TClassInfo }
 
@@ -52,6 +53,8 @@ type
     destructor Destroy; override;
     function ToString: ansistring; override;
   end;
+
+
 
 type
 
@@ -67,15 +70,15 @@ type
     class function KTypeToSimpleKType(AType: string): string;
     class procedure KTypeExtractMapKTypes(AType: string; out p1: string; out p2: string);
 
+    // common
+    class function KTypeToCallMethod(AType: string): string;
+
     // cpp
     class function KTypeToCType(AType: string): string;
     class function KTypeToCMapType(AType: string): string;
     class procedure KTypeExtractCMapTypes(AType: string; out p1: string; out p2: string);
     class function KTypeToPType(AType: string): string;
-    class function KTypeToCallMethod(AType: string): string;
-    //class function KTypeToGetSig(AType: string; AFullFields: TParamMap): string;
-    //class function KTypeToSetSig(AType: string; AFullFields: TParamMap): string;
-    //class function KTypeToSig(AType: string; AFullFields: TParamMap): string;
+
     class function KFieldToGetName(AField: string): string;
     class function KFieldToSetName(AField: string): string;
     class function KFieldToFirstUpper(AField: string): string;
@@ -274,225 +277,6 @@ begin
   if (r = '') then r := 'CallObjectMethod';
   Exit(r);
 end;
-
-(*
-class function TTypeConvert.KTypeToGetSig(AType: string; AFullFields: TParamMap
-  ): string;
-const
-  HEAD_ARRAY = 'Array<';
-  HEAD_LIST = 'List<';
-  HEAD_MAP = 'Map<';
-  HEAD_SET = 'Set<';
-var
-  r: string = '';
-  isArray: Boolean = False;
-  isList: Boolean = False;
-  isMap: Boolean = False;
-  isSet: Boolean = False;
-begin
-  if (AType.StartsWith(HEAD_ARRAY)) then begin
-    isArray:= True;
-    AType:= AType.Replace(HEAD_ARRAY, '', [rfIgnoreCase, rfReplaceAll]).Trim.Trim(['>']);
-  end;
-  if (AType.Contains(HEAD_LIST)) then begin
-    isList:= True;
-    AType:= AType.Substring(AType.IndexOf(HEAD_LIST) + HEAD_LIST.Length).Trim.Trim(['>']);
-  end;
-  if (AType.Contains(HEAD_MAP)) then begin
-    isMap:= True;
-    AType:= AType.Substring(AType.IndexOf(HEAD_MAP) + HEAD_MAP.Length).Trim.Trim(['>']);
-  end;
-  if (AType.Contains(HEAD_SET)) then begin
-    isSet:= True;
-    AType:= AType.Substring(AType.IndexOf(HEAD_SET) + HEAD_SET.Length).Trim.Trim(['>']);
-  end;
-
-  if (isArray) then begin
-    if (AType = 'Int') then r := '()[I';
-    if (AType = 'Double') then r := '()[D';
-    if (AType = 'Boolean') then r := '()[Z';
-    if (AType = 'Byte') then r := '()[B';
-    if (AType = 'Char') then r := '()[C';
-    if (AType = 'Short') then r := '()[S';
-    if (AType = 'Long') then r := '()[J';
-    if (AType = 'Float') then r := '()[F';
-    if (r = '') then
-      if (AFullFields.IndexOf(AType) <> -1) then
-        r := '()[L' + AFullFields.KeyData[AType].replace('.', '/', [rfReplaceAll, rfIgnoreCase]) + ';'
-      else
-        r := '()[Ljava/lang/' + AType + ';';
-  end else if (isList) then begin
-    // list
-    r := '()Ljava/util/ArrayList;';
-  end else if (isMap) then begin
-    // map
-    r := '()Ljava/util/HashMap;';
-  end else if (isSet) then begin
-    // set
-    r := '()Ljava/util/HashSet;';
-  end else begin
-    if (AType = 'Int') then r := '()I';
-    if (AType = 'Double') then r := '()D';
-    if (AType = 'Boolean') then r := '()Z';
-    if (AType = 'Byte') then r := '()B';
-    if (AType = 'Char') then r := '()C';
-    if (AType = 'Short') then r := '()S';
-    if (AType = 'Long') then r := '()J';
-    if (AType = 'Float') then r := '()F';
-    if (r = '' ) then
-      if (AFullFields.IndexOf(AType) <> -1) then
-        r := '()L' + AFullFields.KeyData[AType].replace('.', '/', [rfIgnoreCase, rfReplaceAll]) + ';'
-      else
-        r := '()Ljava/lang/' + AType + ';';
-  end;
-  Exit(r);
-end;
-
-class function TTypeConvert.KTypeToSetSig(AType: string; AFullFields: TParamMap
-  ): string;
-const
-  HEAD_ARRAY = 'Array<';
-  HEAD_LIST = 'List<';
-  HEAD_MAP = 'Map<';
-  HEAD_SET = 'Set<';
-var
-  r: string;
-  isArray: Boolean = False;
-  isList: Boolean = False;
-  isMap: Boolean = False;
-  isSet: Boolean = False;
-begin
-  if (AType.StartsWith(HEAD_ARRAY)) then begin
-    isArray:= True;
-    AType:= AType.Replace(HEAD_ARRAY, '', [rfIgnoreCase, rfReplaceAll]).Trim.Trim(['>']);
-  end;
-  if (AType.Contains(HEAD_LIST)) then begin
-    isList:= True;
-    AType:= AType.Substring(AType.IndexOf(HEAD_LIST) + HEAD_LIST.Length).Trim.Trim(['>']);
-  end;
-  if (AType.Contains(HEAD_MAP)) then begin
-    isMap:= True;
-    AType:= AType.Substring(AType.IndexOf(HEAD_MAP) + HEAD_MAP.Length).Trim.Trim(['>']);
-  end;
-  if (AType.Contains(HEAD_SET)) then begin
-    isSet:= True;
-    AType:= AType.Substring(AType.IndexOf(HEAD_SET) + HEAD_SET.Length).Trim.Trim(['>']);
-  end;
-
-  if (isArray) then begin
-    if (AType = 'Int') then r := '([I)V';
-    if (AType = 'Double') then r := '([D)V';
-    if (AType = 'Boolean') then r := '([Z)V';
-    if (AType = 'Byte') then r := '([B)V';
-    if (AType = 'Char') then r := '([C)V';
-    if (AType = 'Short') then r := '([S]V';
-    if (AType = 'Long') then r := '([J)V';
-    if (AType = 'Float') then r := '([F)V';
-    if (r = '') then
-      if (AFullFields.IndexOf(AType) <> -1) then
-        r := '([L' + AFullFields.KeyData[AType].replace('.', '/', [rfReplaceAll, rfIgnoreCase]) + ';)V'
-      else
-        r := '([Ljava/lang/' + AType + ';)V';
-  end  else if (isList) then begin
-    // list
-    r := '(Ljava/util/ArrayList;)V'
-  end else if (isMap) then begin
-    // map
-    r := '(Ljava/util/HashMap;)V'
-  end else if (isSet) then begin
-    // set
-    r := '(Ljava/util/HashSet;)V'
-  end else begin
-    if (AType = 'Int') then r := '(I)V';
-    if (AType = 'Double') then r := '(D)V';
-    if (AType = 'Boolean') then r := '(Z)V';
-    if (AType = 'Byte') then r := '(B)V';
-    if (AType = 'Char') then r := '(C)V';
-    if (AType = 'Short') then r := '(S)V';
-    if (AType = 'Long') then r := '(J)V';
-    if (AType = 'Float') then r := '(F)V';
-    if (r = '') then
-      if (AFullFields.IndexOf(AType) <> -1) then
-        r := '(L' + AFullFields.KeyData[AType].replace('.', '/', [rfIgnoreCase, rfReplaceAll]) + ';)V'
-      else
-        r := '(Ljava/lang/' + AType + ';)V';
-  end;
-  Exit(r);
-end;
-
-class function TTypeConvert.KTypeToSig(AType: string; AFullFields: TParamMap
-  ): string;
-const
-  HEAD_ARRAY = 'Array<';
-  HEAD_LIST = 'List<';
-  HEAD_MAP = 'Map<';
-  HEAD_SET = 'Set<';
-var
-  r: string;
-  isArray: Boolean = False;
-  isList: Boolean = False;
-  isMap: Boolean = False;
-  isSet: Boolean = False;
-begin
-  if (AType.StartsWith(HEAD_ARRAY)) then begin
-    isArray:= True;
-    AType:= AType.Replace(HEAD_ARRAY, '', [rfIgnoreCase, rfReplaceAll]).Trim.Trim(['>']);
-  end;
-  if (AType.Contains(HEAD_LIST)) then begin
-    isList:= True;
-    AType:= AType.Substring(AType.IndexOf(HEAD_LIST) + HEAD_LIST.Length).Trim.Trim(['>']);
-  end;
-  if (AType.Contains(HEAD_MAP)) then begin
-    isMap:= True;
-    AType:= AType.Substring(AType.IndexOf(HEAD_MAP) + HEAD_MAP.Length).Trim.Trim(['>']);
-  end;
-  if (AType.Contains(HEAD_SET)) then begin
-    isSet:= True;
-    AType:= AType.Substring(AType.IndexOf(HEAD_SET) + HEAD_SET.Length).Trim.Trim(['>']);
-  end;
-
-  if (isArray) then begin
-    if (AType = 'Int') then r := '[I';
-    if (AType = 'Double') then r := '[D';
-    if (AType = 'Boolean') then r := '[Z';
-    if (AType = 'Byte') then r := '[B';
-    if (AType = 'Char') then r := '[C';
-    if (AType = 'Short') then r := '[S';
-    if (AType = 'Long') then r := '[J';
-    if (AType = 'Float') then r := '[F';
-    if (r = '') then
-      if (AFullFields.IndexOf(AType) <> -1) then
-        r := '[L' + AFullFields.KeyData[AType].replace('.', '/', [rfReplaceAll, rfIgnoreCase]) + ';'
-      else
-        r := '[Ljava/lang/' + AType + ';';
-  end  else if (isList) then begin
-    // list
-    r := 'Ljava/util/ArrayList;'
-  end else if (isMap) then begin
-    // map
-    r := 'Ljava/util/HashMap;'
-  end else if (isSet) then begin
-    // set
-    r := 'Ljava/util/HashSet;'
-  end else begin
-    if (AType = 'Int') then r := 'I';
-    if (AType = 'Double') then r := 'D';
-    if (AType = 'Boolean') then r := 'Z';
-    if (AType = 'Byte') then r := 'B';
-    if (AType = 'Char') then r := 'C';
-    if (AType = 'Short') then r := 'S';
-    if (AType = 'Long') then r := 'J';
-    if (AType = 'Float') then r := 'F';
-    if (r = '') then
-      if (AFullFields.IndexOf(AType) <> -1) then
-        r := 'L' + AFullFields.KeyData[AType].replace('.', '/', [rfIgnoreCase, rfReplaceAll]) + ';'
-      else
-        r := 'Ljava/lang/' + AType + ';';
-  end;
-  Exit(r);
-end;
-
-*)
 
 class function TTypeConvert.KFieldToGetName(AField: string): string;
 begin
