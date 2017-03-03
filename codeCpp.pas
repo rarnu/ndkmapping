@@ -47,20 +47,17 @@ begin
       if (AClassInfo.fieldList[i].baseType.fieldCategory = ftcObject) then begin
         if (not AClassInfo.fieldList[i].isList) and (not AClassInfo.fieldList[i].isMap) and (not AClassInfo.fieldList[i].isSet) then begin
           tInc:= Format('#include "%s.h"', [AClassInfo.fieldList[i].baseType.fieldType]);
-          WriteLn('1: ' + tInc);
           if (Text.IndexOf(tInc) = -1) then Add(tInc);
         end else begin
           if (AClassInfo.fieldList[i].genericType1 <> nil) then begin
             if (AClassInfo.fieldList[i].genericType1.fieldCategory = ftcObject) then begin
               tInc:= Format('#include "%s.h"', [AClassInfo.fieldList[i].genericType1.fieldType]);
-              WriteLn('2: ' + tInc);
               if (Text.IndexOf(tInc) = -1) then Add(tInc);
             end;
           end;
           if (AClassInfo.fieldList[i].genericType2 <> nil) then begin
             if (AClassInfo.fieldList[i].genericType2.fieldCategory = ftcObject) then begin
               tInc:= Format('#include "%s.h"', [AClassInfo.fieldList[i].genericType2.fieldType]);
-              WriteLn('3: ' + tInc);
               if (Text.IndexOf(tInc) = -1) then Add(tInc);
             end;
           end;
@@ -137,8 +134,6 @@ var
   addMethodList: TFieldMap;
 begin
   addMethodList:= TFieldMap.Create;
-
-
   codeList := TStringList.Create;
   with codeList do begin
     Add(Format('#include "%s.h"', [AClassInfo.ktClassName]));
@@ -151,6 +146,7 @@ begin
     Add(Format('        jclass cls = env->FindClass("%s");', [AClassInfo.fullPackageName.Replace('.', '/', [rfIgnoreCase, rfReplaceAll])]));
     for i := 0 to AClassInfo.fieldList.Count - 1 do begin
       if (i = 0) then begin
+
         Add(Format('        jmethodID m = env->GetMethodID(cls, "%s", "()%s");', [
           TTypeConvert.KFieldToGetName(AClassInfo.fieldList[i].fieldName),
           AClassInfo.fieldList[i].baseType.fieldSignature]));
@@ -160,28 +156,27 @@ begin
           AClassInfo.fieldList[i].baseType.fieldSignature]));
       end;
       callType:= TTypeConvert.KTypeToCallMethod(AClassInfo.fieldList[i].baseType.fieldType);
-      WriteLn('CALLTYPE => ' + callType + ', Sig: ' + AClassInfo.fieldList[i].baseType.fieldSignature);
       if (callType.Contains('Object')) then begin
         if (AClassInfo.fieldList[i].isArray) then begin
-          Add(Format('        %s_jarrayToObjectArray(env, env->CallObjectMethod(obj, m), %s);', [
+          Add(Format('        %s_jarrayToObjectArray(env, env->CallObjectMethod(obj, m), ret->%s);', [
             AClassInfo.fieldList[i].fieldName, AClassInfo.fieldList[i].fieldName]));
           addMethodList.Add(Format('void %s_jarrayToObjectArray(JNIEnv *env, jobject arr, %s (&dest)[%d])', [
             AClassInfo.fieldList[i].fieldName, TTypeConvert.KTypeToCType(AClassInfo.fieldList[i].baseType.fieldType), AMaxArraySize]), AClassInfo.fieldList[i]);
         end else if (AClassInfo.fieldList[i].isList) then begin
-          Add(Format('        %s_jArrayListToList(env, env->CallObjectMethod(obj, m), %s)', [
+          Add(Format('        %s_jArrayListToList(env, env->CallObjectMethod(obj, m), ret->%s);', [
             AClassInfo.fieldList[i].fieldName, AClassInfo.fieldList[i].fieldName]));
           addMethodList.Add(Format('void %s_jArrayListToList(JNIEnv *env, jobject obj, list<%s> &lst)', [
             AClassInfo.fieldList[i].fieldName, TTypeConvert.KTypeToCType(AClassInfo.fieldList[i].genericType1.fieldType)]), AClassInfo.fieldList[i]);
         end else if (AClassInfo.fieldList[i].isMap) then begin
-          Add(Format('        %s_jHashMapToMap(env, env->CallObjectMethod(obj, m) %s);', [
+          Add(Format('        %s_jHashMapToMap(env, env->CallObjectMethod(obj, m), ret->%s);', [
             AClassInfo.fieldList[i].fieldName, AClassInfo.fieldList[i].fieldName]));
           addMethodList.Add(Format('void %s_jHashMapToMap(JNIEnv *env, jobject obj, map<%s, %s> &mp)', [
             AClassInfo.fieldList[i].fieldName, TTypeConvert.KTypeToCType(AClassInfo.fieldList[i].genericType1.fieldType), TTypeConvert.KTypeToCType(AClassInfo.fieldList[i].genericType2.fieldType)]),
             AClassInfo.fieldList[i]);
         end else if (AClassInfo.fieldList[i].isSet) then begin
-          Add(Format('        %s_jHashSetToSet(env, env->CallObjectMethod(obj, m), %s);', [
+          Add(Format('        %s_jHashSetToSet(env, env->CallObjectMethod(obj, m), ret->%s);', [
             AClassInfo.fieldList[i].fieldName, AClassInfo.fieldList[i].fieldName]));
-          addMethodList.Add(Format('void %s_jHashSetToSet(JNIEnv *env, jobject obj, set<%s> &st);', [
+          addMethodList.Add(Format('void %s_jHashSetToSet(JNIEnv *env, jobject obj, set<%s> &st)', [
             AClassInfo.fieldList[i].fieldName, TTypeConvert.KTypeToCType(AClassInfo.fieldList[i].genericType1.fieldType)]), AClassInfo.fieldList[i]);
         end else begin
           if (TTypeConvert.KTypeToCType(AClassInfo.fieldList[i].baseType.fieldType) = 'string') then begin
@@ -192,7 +187,7 @@ begin
         end;
       end else begin
         if (AClassInfo.fieldList[i].isArray) then begin
-          Add(Format('        %s_jarrayToArray(env, env->CallObjectMethod(obj, m), %s);', [
+          Add(Format('        %s_jarrayToArray(env, env->CallObjectMethod(obj, m), ret->%s);', [
             AClassInfo.fieldList[i].fieldName, AClassInfo.fieldList[i].fieldName]));
           addMethodList.Add(Format('void %s_jarrayToArray(JNIEnv *env, jobject arr, %s (&dest)[%d])', [
             AClassInfo.fieldList[i].fieldName, TTypeConvert.KTypeToCType(AClassInfo.fieldList[i].baseType.fieldType), AMaxArraySize]), AClassInfo.fieldList[i]);
@@ -224,8 +219,11 @@ begin
 
   // generate head code
   codeList := TStringList.Create;
-  head(codeList, AClassInfo);
   with codeList do begin
+    Add(Format('#ifndef %s_H', [AClassInfo.ktClassName.ToUpper]));
+    Add(Format('#define %s_H', [AClassInfo.ktClassName.ToUpper]));
+    Add('');
+    head(codeList, AClassInfo);
     Add('');
     Add(Format('class %s {', [AClassInfo.ktClassName]));
     Add('public:');
@@ -244,8 +242,10 @@ begin
     end;
     Add('    static ' + AClassInfo.ktClassName + '* fromJObject(JNIEnv *env, jobject obj);');
     Add('    jobject toJObject(JNIEnv *env);');
-    for i := 0 to addMethodList.Count - 1 do Add(Format('    %s;', [addMethodList.Keys[i]]));
+    for i := 0 to addMethodList.Count - 1 do Add(Format('    static %s;', [addMethodList.Keys[i]]));
     Add('};');
+    Add('');
+    Add(Format('#endif // %s_H', [AClassInfo.ktClassName.ToUpper]));
     SaveToFile(AOutPath + AClassInfo.ktClassName + '.h');
     Free;
   end;
