@@ -8,6 +8,8 @@ uses
   Classes, SysUtils, fgl, strutils;
 
 type
+  TImplCategory = (icJArrayToObjectArray, icJArrayToSimpleArray, icJArrayListToList, icJHashMapToMap, icJHashSetToSet, icArrayToJArray, icListToJArrayList, icMapToJHashMap, icSetToJHashSet);
+
   TFieldTypeCategory = (ftcSimple, ftcString, ftcObject);
 
   { TFieldType }
@@ -54,8 +56,6 @@ type
     function ToString: ansistring; override;
   end;
 
-
-
 type
 
   { TTypeConvert }
@@ -70,8 +70,13 @@ type
     class function KTypeToSimpleKType(AType: string): string;
     class procedure KTypeExtractMapKTypes(AType: string; out p1: string; out p2: string);
 
+    // jni
+    class function KTypeToJNIType(AType: string): string;
+
     // common
     class function KTypeToCallMethod(AType: string): string;
+
+    class function ToFirstUpper(AField: string): string;
 
     // cpp
     class function KTypeToCType(AType: string): string;
@@ -81,7 +86,7 @@ type
 
     class function KFieldToGetName(AField: string): string;
     class function KFieldToSetName(AField: string): string;
-    class function KFieldToFirstUpper(AField: string): string;
+
   end;
 
 implementation
@@ -195,6 +200,21 @@ begin
   p2 := arr[1].Trim;
 end;
 
+class function TTypeConvert.KTypeToJNIType(AType: string): string;
+var
+  r: string = '';
+begin
+  if (AType = 'Int') then r := 'int';
+  if (AType = 'Double') then r := 'double';
+  if (AType = 'Boolean') then r := 'boolean';
+  if (AType = 'Byte') then r := 'byte';
+  if (AType = 'Char') then r := 'char';
+  if (AType = 'Short') then r := 'short';
+  if (AType = 'Long') then r := 'long';
+  if (AType = 'Float') then r := 'float';
+  Exit(r);
+end;
+
 class function TTypeConvert.KTypeToCType(AType: string): string;
 const
   HEAD_ARRAY = 'Array<';
@@ -288,7 +308,7 @@ begin
   Result := 'set' + UpperCase(AField[1]) + AField.Substring(1);
 end;
 
-class function TTypeConvert.KFieldToFirstUpper(AField: string): string;
+class function TTypeConvert.ToFirstUpper(AField: string): string;
 begin
   Result := UpperCase(AField[1]) + AField.Substring(1);
 end;
