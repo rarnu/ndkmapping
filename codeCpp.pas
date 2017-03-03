@@ -241,11 +241,43 @@ begin
       end;
     icMapToJHashMap:
       begin
-        // TODO:
+        Add('    jclass clsMap = env->FindClass("java/util/HashMap");');
+        Add('    jmethodID mInitMap = env->GetMethodID(clsMap, "<init>", "()V");');
+        Add('    jmethodID mPut = env->GetMethodID(clsMap, "put", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");');
+        Add('    jobject ret = env->NewObject(clsMap, mInitMap);');
+        Add('    for (auto iter = mp.begin(); iter != mp.end(); iter++) {');
+        if (TTypeConvert.KTypeToCType(AType.fieldType).Contains('*')) then
+          Add('        jobject key = iter->first->toJObject(env);')
+        else if (TTypeConvert.KTypeToCType(AType.fieldType) = 'string') then
+          Add('        jstring key = env->NewStringUTF(iter->first.data());')
+        else
+          Add(Format('        j%s key = (j%s) iter->first;', [TTypeConvert.KTypeToJNIType(AType.fieldType), TTypeConvert.KTypeToJNIType(AType.fieldType)]));
+        if (TTypeConvert.KTypeToCType(AType2.fieldType).Contains('*')) then
+          Add('        jobject val = iter->second->toJObject(env);')
+        else if (TTypeConvert.KTypeToCType(AType2.fieldType) = 'string') then
+          Add('        jstring val = env->NewStringUTF(iter->second.data());')
+        else
+          Add(Format('        j%s val = (j%s) iter->second;', [TTypeConvert.KTypeToJNIType(AType.fieldType), TTypeConvert.KTypeToJNIType(AType.fieldType)]));
+        Add('        env->CallObjectMethod(ret, mPut, key, val);');
+        Add('    }');
+        Add('    return ret;');
       end;
     icSetToJHashSet:
       begin
-        // TODO:
+        Add('    jclass clsSet = env->FindClass("java/util/HashSet");');
+        Add('    jmethodID mInitSet = env->GetMethodID(clsSet, "<init>", "()V");');
+        Add('    jmethodID mAdd = env->GetMethodID(clsSet, "add", "(Ljava/lang/Object;)Z");');
+        Add('    jobject ret = env->NewObject(clsSet, mInitSet);');
+        Add('    for (auto iter = st.begin(); iter != st.end(); iter++) {');
+        if (TTypeConvert.KTypeToCType(AType.fieldType).Contains('*')) then
+          Add('        jobject key = (*iter)->toJObject(env);')
+        else if (TTypeConvert.KTypeToCType(AType.fieldType) = 'string') then
+          Add('        jstring key = env->NewStringUTF((*iter).data());')
+        else
+          Add(Format('        j%s key = (j%s) (*iter);', [TTypeConvert.KTypeToJNIType(AType.fieldType), TTypeConvert.KTypeToJNIType(AType.fieldType)]));
+        Add('        env->CallBooleanMethod(ret, mAdd, key);');
+        Add('    }');
+        Add('    return ret;');
       end;
     end;
   end;
