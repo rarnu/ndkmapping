@@ -3,7 +3,7 @@ program ndktester;
 {$mode objfpc}{$H+}
 
 uses
-  cthreads, Classes, SysUtils, CustApp;
+  cthreads, Classes, SysUtils, CustApp, testGenerater;
 
 type
 
@@ -75,7 +75,12 @@ begin
     end;
   end;
 
-  // TODO: generate test api
+  // generate test api
+  if (not outPath.EndsWith('/')) then outPath += '/';
+  TTestGenerator.generateDir(lng, outPath, mainDir);
+
+  if (bld.Contains('mk')) then TTestGenerator.injectMakefile(lng, outPath);
+  if (bld = 'mkshcp') then TTestGenerator.injectShellCopy(lng, outPath, cpPath);
 
   Terminate;
 end;
