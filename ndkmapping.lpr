@@ -3,8 +3,7 @@ program ndkmapping;
 {$mode objfpc}{$H+}
 
 uses
-  cthreads, Classes, sysutils, CustApp, codeGenerater, codeParser, codeTypes,
-  codeCpp, codePas;
+  cthreads, Classes, sysutils, CustApp, codeGenerater;
 
 type
 
@@ -27,7 +26,6 @@ var
   bld: string = '';  // build options
   op: string = '';   // output path
   mx: Integer = 0;   // max array size
-  alng: string = ''; // api language
   mainDir: string = '';  // main kotlin file path
   fileList: TStringList;
 begin
@@ -35,7 +33,7 @@ begin
   if (HasOption('b')) then bld := GetOptionValue('b');
   if (HasOption('o')) then op := GetOptionValue('o');
   if (HasOption('m')) then mx := StrToIntDef(GetOptionValue('m'), 0);
-  if (HasOption('a')) then alng:= GetOptionValue('a');
+
   mainDir:= ParamStr(ParamCount);
   if (lng = '') or (op = '') or (mainDir = '') or (not DirectoryExists(mainDir)) then begin
     WriteHelp;
@@ -57,12 +55,6 @@ begin
     Exit;
   end;
 
-  if (alng <> '') and (alng <> 'kotlin') and (alng <> 'java') then begin
-    WriteHelp;
-    Terminate;
-    Exit;
-  end;
-
   if (not DirectoryExists(op)) then ForceDirectories(op);
   if (not DirectoryExists(op)) then begin
     WriteHelp;
@@ -77,13 +69,6 @@ begin
 
   if (bld.Contains('mk')) then TCodeGenerator.generateMakefile(lng, op);
   if (bld.Contains('sh')) then TCodeGenerator.genetateShellfile(lng, op);
-  if (alng = 'kotlin') then begin
-    // TODO: generate kotlin api sample
-  end;
-
-  if (alng = 'java') then begin
-    // TODO: generate java api sample
-  end;
 
   fileList.Free;
   Terminate;
@@ -112,7 +97,6 @@ begin
   WriteLn('        -l language (cpp, pas)');
   WriteLn('        -b build option (mk, mksh)');
   WriteLn('        -m max array size (must >= 0)');
-  WriteLn('        -a generate test api file with language (kotlin, java)');
   WriteLn('        -o output path');
   WriteLn('');
   WriteLn('sample:');
