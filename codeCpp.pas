@@ -119,21 +119,30 @@ begin
       end;
     icJArrayToSimpleArray:
       begin
-        Add(Format('    j%sArray jarr = (j%sArray) arr;', [TTypeConvert.KTypeToJNIType(AType.fieldType), TTypeConvert.KTypeToJNIType(AType.fieldType)]));
+        Add(Format('    jclass jTCls = env->FindClass("%s");', [
+          AType.fieldFullPackageName.Replace('.', '/', [rfIgnoreCase, rfReplaceAll])]));
+        Add(Format('    jmethodID mValue = env->GetMethodID(jTCls, "%s", "%s");', [
+          TTypeConvert.KTypeToJObjectGetName(AType.fieldType), TTypeConvert.KTypeToJObjectGetSig(AType.fieldType)]));
+        Add('    jobjectArray jarr = (jobjectArray) arr;');
         Add('    int count = env->GetArrayLength(jarr);');
-        Add(Format('    j%s* %sarr = env->Get%sArrayElements(jarr, NULL);', [
-          TTypeConvert.KTypeToJNIType(AType.fieldType), TTypeConvert.KTypeToJNIType(AType.fieldType), TTypeConvert.ToFirstUpper(TTypeConvert.KTypeToJNIType(AType.fieldType))]));
         Add('    for (int i = 0; i < count; i++) {');
-        Add(Format('        dest[i] = (%s) %sarr[i];', [TTypeConvert.KTypeToCType(AType.fieldType), TTypeConvert.KTypeToJNIType(AType.fieldType)]));
+        Add('        jobject tmpObj = env->GetObjectArrayElement(jarr, i);');
+        Add(Format('        dest[i] = (%s) env->%s(tmpObj, mValue);', [
+          TTypeConvert.KTypeToCType(AType.fieldType), TTypeConvert.KTypeToCallMethod(AType.fieldType)]));
         Add('    }');
-        Add(Format('    env->ReleaseIntArrayElements(jarr, %sarr, 0);', [TTypeConvert.KTypeToJNIType(AType.fieldType)]));
       end;
     icJArrayListToList:
       begin
         Add('    lst.clear();');
-        Add('    jclass clsList = env->FindClass("java/util/ArrayList");');
+        Add('    jclass clsList = env->FindClass("java/util/List");');
         Add('    jmethodID mGet = env->GetMethodID(clsList, "get", "(I)Ljava/lang/Object;");');
         Add('    jmethodID mSize = env->GetMethodID(clsList, "size", "()I");');
+        if (TTypeConvert.KTypeIsBasicType(AType.fieldType)) then begin
+          Add(Format('    jclass jTCls = env->FindClass("%s");', [
+            AType.fieldFullPackageName.Replace('.', '/', [rfReplaceAll, rfIgnoreCase])]));
+          Add(Format('    jmethodID mValue = env->GetMethodID(jTCls, "%s", "%s");', [
+            TTypeConvert.KTypeToJObjectGetName(AType.fieldType), TTypeConvert.KTypeToJObjectGetSig(AType.fieldType)]));
+        end;
         Add('    int count = env->CallIntMethod(obj, mSize);');
         Add('    for (int i = 0; i < count; i++) {');
         Add('        jobject jo = env->CallObjectMethod(obj, mGet, i);');
@@ -141,15 +150,17 @@ begin
           Add(Format('        %s item = %s::fromJObject(env, jo);', [TTypeConvert.KTypeToCType(AType.fieldType), AType.fieldType]))
         else if (TTypeConvert.KTypeToCType(AType.fieldType) = 'string') then
           Add('        string item = string(env->GetStringUTFChars((jstring) jo, NULL));')
-        else
-          Add(Format('        %s item = (%s) jo;', [TTypeConvert.KTypeToCType(AType.fieldType), TTypeConvert.KTypeToCType(AType.fieldType)]));
+        else begin
+          Add(Format('        %s item = (%s) env->%s(jo, mValue);', [
+            TTypeConvert.KTypeToCType(AType.fieldType), TTypeConvert.KTypeToCType(AType.fieldType), TTypeConvert.KTypeToCallMethod(AType.fieldType)]));
+        end;
         Add('        lst.push_back(item);');
         Add('    }');
       end;
     icJHashMapToMap:
       begin
         Add('    mp.clear();');
-        Add('    jclass clsMap = env->FindClass("java/util/HashMap");');
+        Add('    jclass clsMap = env->FindClass("java/util/Map");');
         Add('    jclass clsSet = env->FindClass("java/util/Set");');
         Add('    jclass clsIter = env->FindClass("java/util/Iterator");');
         Add('    jmethodID mKeySet = env->GetMethodID(clsMap, "keySet", "()Ljava/util/Set;");');
@@ -159,6 +170,18 @@ begin
         Add('    jmethodID mHasNext = env->GetMethodID(clsIter, "hasNext", "()Z");');
         Add('    jobject objSet = env->CallObjectMethod(obj, mKeySet);');
         Add('    jobject objIter = env->CallObjectMethod(objSet, mIter);');
+        if (TTypeConvert.KTypeIsBasicType(AType.fieldType)) then begin
+          Add(Format('    jclass jT1Cls = env->FindClass("%s");', [
+            AType.fieldFullPackageName.Replace('.', '/', [rfIgnoreCase, rfReplaceAll])]));
+          Add(Format('    jmethodID jT1Value = env->GetMethodID(jT1Cls, "%s", "%s");', [
+            TTypeConvert.KTypeToJObjectGetName(AType.fieldType), TTypeConvert.KTypeToJObjectGetSig(AType.fieldType)]));
+        end;
+        if (TTypeConvert.KTypeIsBasicType(AType2.fieldType)) then begin
+          Add(Format('    jclass jT2Cls = env->FindClass("%s");', [
+            AType2.fieldFullPackageName.Replace('.', '/', [rfIgnoreCase, rfReplaceAll])]));
+          Add(Format('    jmethodID jT2Value = env->GetMethodID(jT2Cls, "%s", "%s");', [
+            TTypeConvert.KTypeToJObjectGetName(AType2.fieldType), TTypeConvert.KTypeToJObjectGetSig(AType2.fieldType)]));
+        end;
         Add('    while (true) {');
         Add('        jboolean hasNext = env->CallBooleanMethod(objIter, mHasNext);');
         Add('        if (hasNext == JNI_FALSE) {');
@@ -170,26 +193,36 @@ begin
           Add(Format('        %s mKey = %s::fromJObject(env, val);', [TTypeConvert.KTypeToCType(AType.fieldType), AType.fieldType]))
         else if (TTypeConvert.KTypeToCType(AType.fieldType) = 'string') then
           Add('        string mKey = string(env->GetStringUTFChars((jstring) key, NULL));')
-        else
-          Add(Format('        %s mKey = (%s) key;', [TTypeConvert.KTypeToCType(AType.fieldType), TTypeConvert.KTypeToCType(AType.fieldType)]));
+        else begin
+          Add(Format('        %s mKey = (%s) env->%s(key, jT1Value);', [
+            TTypeConvert.KTypeToCType(AType.fieldType), TTypeConvert.KTypeToCType(AType.fieldType), TTypeConvert.KTypeToCallMethod(AType.fieldType)]));
+        end;
         if (TTypeConvert.KTypeToCType(AType2.fieldType).Contains('*')) then
           Add(Format('        %s mVal = %s::fromJObject(env, val);', [TTypeConvert.KTypeToCType(AType2.fieldType), AType2.fieldType]))
         else if (TTypeConvert.KTypeToCType(AType2.fieldType) = 'string') then
           Add('        string mVal = string(env->GetStringUTFChars((jstring) val, NULL));')
-        else
-          Add(Format('        %s mVal = (%s) val;', [TTypeConvert.KTypeToCType(AType2.fieldType), TTypeConvert.KTypeToCType(AType2.fieldType)]));
+        else begin
+          Add(Format('        %s mVal = (%s) env->%s(val, jT2Value);', [
+            TTypeConvert.KTypeToCType(AType2.fieldType), TTypeConvert.KTypeToCType(AType2.fieldType), TTypeConvert.KTypeToCallMethod(AType2.fieldType)]));
+        end;
         Add('        mp[mKey] = mVal;');
         Add('    }');
       end;
     icJHashSetToSet:
       begin
         Add('    st.clear();');
-        Add('    jclass clsSet = env->FindClass("java/util/HashSet");');
+        Add('    jclass clsSet = env->FindClass("java/util/Set");');
         Add('    jclass clsIter = env->FindClass("java/util/Iterator");');
         Add('    jmethodID mIter = env->GetMethodID(clsSet, "iterator", "()Ljava/util/Iterator;");');
         Add('    jmethodID mNext = env->GetMethodID(clsIter, "next", "()Ljava/lang/Object;");');
         Add('    jmethodID mHasNext = env->GetMethodID(clsIter, "hasNext", "()Z");');
         Add('    jobject objIter = env->CallObjectMethod(obj, mIter);');
+        if (TTypeConvert.KTypeIsBasicType(AType.fieldType)) then begin
+          Add(Format('    jclass jTCls = env->FindClass("%s");', [
+            AType.fieldFullPackageName.Replace('.', '/', [rfReplaceAll, rfIgnoreCase])]));
+          Add(Format('    jmethodID mValue = env->GetMethodID(jTCls, "%s", "%s");', [
+            TTypeConvert.KTypeToJObjectGetName(AType.fieldType), TTypeConvert.KTypeToJObjectGetSig(AType.fieldType)]));
+        end;
         Add('    while (true) {');
         Add('        jboolean hasNext = env->CallBooleanMethod(objIter, mHasNext);');
         Add('        if (hasNext == JNI_FALSE) {');
@@ -200,26 +233,32 @@ begin
           Add(Format('        %s mKey = %s::fromJObject(env, key);', [TTypeConvert.KTypeToCType(AType.fieldType), AType.fieldType]))
         else if (TTypeConvert.KTypeToCType(AType.fieldType) = 'string') then
           Add('        string mKey = string(env->GetStringUTFChars((jstring) key, NULL));')
-        else
-          Add(Format('        %s mKey = (%s) key;', [TTypeConvert.KTypeToCType(AType.fieldType), TTypeConvert.KTypeToCType(AType.fieldType)]));
+        else begin
+          Add(Format('        %s mKey = (%s) env->%s(key, mValue);', [
+            TTypeConvert.KTypeToCType(AType.fieldType), TTypeConvert.KTypeToCType(AType.fieldType), TTypeConvert.KTypeToCallMethod(AType.fieldType)]));
+        end;
         Add('        st.insert(mKey);');
         Add('    }');
       end;
     icArrayToJArray:
       begin
-        if (TTypeConvert.KTypeToCType(AType.fieldType).Contains('*')) or (TTypeConvert.KTypeToCType(AType.fieldType) = 'string') then begin
-          Add(Format('    jclass clsType = env->FindClass("%s");', [AType.fieldFullPackageName.Replace('.', '/', [rfIgnoreCase, rfReplaceAll])]));
-          Add(Format('    jobjectArray ret = env->NewObjectArray(%d, clsType, NULL);', [AMaxArraySize]));
-          Add(Format('    for (int i = 0; i < %d; i++) {', [AMaxArraySize]));
-          if (TTypeConvert.KTypeToCType(AType.fieldType) = 'string') then
-            Add('        env->SetObjectArrayElement(ret, i, env->NewStringUTF(dest[i].data()));')
-          else
-            Add('        env->SetObjectArrayElement(ret, i, dest[i]->toJObject(env));');
-          Add('    }');
-        end else begin
-          Add(Format('    j%sArray ret = env->New%sArray(%d);', [TTypeConvert.KTypeToJNIType(AType.fieldType), TTypeConvert.ToFirstUpper(TTypeConvert.KTypeToJNIType(AType.fieldType)), AMaxArraySize]));
-          Add(Format('    env->Set%sArrayRegion(ret, 0, %d, dest);', [TTypeConvert.ToFirstUpper(TTypeConvert.KTypeToJNIType(AType.fieldType)), AMaxArraySize]));
+        Add(Format('    jclass clsType = env->FindClass("%s");', [AType.fieldFullPackageName.Replace('.', '/', [rfIgnoreCase, rfReplaceAll])]));
+        if (TTypeConvert.KTypeIsBasicType(AType.fieldType)) then begin
+          Add(Format('    jmethodID mConstructor = env->GetMethodID(clsType, "<init>", "%s");', [TTypeConvert.KTypeToJObjectConstructorSig(AType.fieldType)]));
         end;
+        Add(Format('    jobjectArray ret = env->NewObjectArray(%d, clsType, NULL);', [AMaxArraySize]));
+        Add(Format('    for (int i = 0; i < %d; i++) {', [AMaxArraySize]));
+        if (TTypeConvert.KTypeIsBasicType(AType.fieldType)) then begin
+          Add('        jobject item = env->NewObject(clsType, mConstructor, dest[i]);');
+          Add('        env->SetObjectArrayElement(ret, i, item);');
+        end else if (TTypeConvert.KTypeToCType(AType.fieldType) = 'string') then
+          Add('        env->SetObjectArrayElement(ret, i, env->NewStringUTF(dest[i].data()));')
+        else begin
+          Add('        if (dest[i] != NULL) {');
+          Add('            env->SetObjectArrayElement(ret, i, dest[i]->toJObject(env));');
+          Add('        }');
+        end;
+        Add('    }');
         Add('    return ret;');
       end;
     icListToJArrayList:
@@ -228,13 +267,18 @@ begin
         Add('    jmethodID mInitList = env->GetMethodID(clsList, "<init>", "()V");');
         Add('    jmethodID mAdd = env->GetMethodID(clsList, "add", "(Ljava/lang/Object;)Z");');
         Add('    jobject ret = env->NewObject(clsList, mInitList);');
+        if (TTypeConvert.KTypeIsBasicType(AType.fieldType)) then begin
+          Add(Format('    jclass clsType = env->FindClass("%s");', [AType.fieldFullPackageName.Replace('.', '/', [rfIgnoreCase, rfReplaceAll])]));
+          Add(Format('    jmethodID mConstructor = env->GetMethodID(clsType, "<init>", "%s");', [TTypeConvert.KTypeToJObjectConstructorSig(AType.fieldType)]));
+        end;
         Add('    for (auto iter = lst.begin(); iter != lst.end(); iter++) {');
         if (TTypeConvert.KTypeToCType(AType.fieldType).Contains('*')) then
           Add('        jobject tmp = (*iter)->toJObject(env);')
         else if (TTypeConvert.KTypeToCType(AType.fieldType) = 'string') then
           Add('        jstring tmp = env->NewStringUTF((*iter).data());')
-        else
-          Add(Format('        j%s tmp = (j%s) (*iter);', [TTypeConvert.KTypeToJNIType(AType.fieldType), TTypeConvert.KTypeToJNIType(AType.fieldType)]));
+        else begin
+          Add(Format('        jobject tmp = env->NewObject(clsType, mConstructor, (j%s) (*iter));', [TTypeConvert.KTypeToJNIType(AType.fieldType)]));
+        end;
         Add('        env->CallBooleanMethod(ret, mAdd, tmp);');
         Add('    }');
         Add('    return ret;');
@@ -245,19 +289,29 @@ begin
         Add('    jmethodID mInitMap = env->GetMethodID(clsMap, "<init>", "()V");');
         Add('    jmethodID mPut = env->GetMethodID(clsMap, "put", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");');
         Add('    jobject ret = env->NewObject(clsMap, mInitMap);');
+        if (TTypeConvert.KTypeIsBasicType(AType.fieldType)) then begin
+          Add(Format('    jclass clsType1 = env->FindClass("%s");', [AType.fieldFullPackageName.Replace('.', '/', [rfIgnoreCase, rfReplaceAll])]));
+          Add(Format('    jmethodID mmConstructor1 = env->GetMethodID(clsType1, "<init>", "%s");', [TTypeConvert.KTypeToJObjectConstructorSig(AType.fieldType)]));
+        end;
+        if (TTypeConvert.KTypeIsBasicType(AType2.fieldType)) then begin
+          Add(Format('    jclass clsType2 = env->FindClass("%s");', [AType2.fieldFullPackageName.Replace('.', '/', [rfIgnoreCase, rfReplaceAll])]));
+          Add(Format('    jmethodID mmConstructor2 = env->GetMethodID(clsType2, "<init>", "%s");', [TTypeConvert.KTypeToJObjectConstructorSig(AType2.fieldType)]));
+        end;
         Add('    for (auto iter = mp.begin(); iter != mp.end(); iter++) {');
         if (TTypeConvert.KTypeToCType(AType.fieldType).Contains('*')) then
           Add('        jobject key = iter->first->toJObject(env);')
         else if (TTypeConvert.KTypeToCType(AType.fieldType) = 'string') then
           Add('        jstring key = env->NewStringUTF(iter->first.data());')
-        else
-          Add(Format('        j%s key = (j%s) iter->first;', [TTypeConvert.KTypeToJNIType(AType.fieldType), TTypeConvert.KTypeToJNIType(AType.fieldType)]));
+        else begin
+          Add('        jobject key = env->NewObject(clsType1, mmConstructor1, (j%s) iter->first);', [TTypeConvert.KTypeToJNIType(AType.fieldType)]);
+        end;
         if (TTypeConvert.KTypeToCType(AType2.fieldType).Contains('*')) then
           Add('        jobject val = iter->second->toJObject(env);')
         else if (TTypeConvert.KTypeToCType(AType2.fieldType) = 'string') then
           Add('        jstring val = env->NewStringUTF(iter->second.data());')
-        else
-          Add(Format('        j%s val = (j%s) iter->second;', [TTypeConvert.KTypeToJNIType(AType.fieldType), TTypeConvert.KTypeToJNIType(AType.fieldType)]));
+        else begin
+          Add('        jobject val = env->NewObject(clsType2, mmConstructor2, (j%s) iter->second);', [TTypeConvert.KTypeToJNIType(AType.fieldType)]);
+        end;
         Add('        env->CallObjectMethod(ret, mPut, key, val);');
         Add('    }');
         Add('    return ret;');
@@ -268,13 +322,18 @@ begin
         Add('    jmethodID mInitSet = env->GetMethodID(clsSet, "<init>", "()V");');
         Add('    jmethodID mAdd = env->GetMethodID(clsSet, "add", "(Ljava/lang/Object;)Z");');
         Add('    jobject ret = env->NewObject(clsSet, mInitSet);');
+        if (TTypeConvert.KTypeIsBasicType(AType.fieldType)) then begin
+          Add(Format('    jclass clsType = env->FindClass("%s");', [AType.fieldFullPackageName.Replace('.', '/', [rfIgnoreCase, rfReplaceAll])]));
+          Add(Format('    jmethodID mConstructor = env->GetMethodID(clsType, "<init>", "%s");', [TTypeConvert.KTypeToJObjectConstructorSig(AType.fieldType)]));
+        end;
         Add('    for (auto iter = st.begin(); iter != st.end(); iter++) {');
         if (TTypeConvert.KTypeToCType(AType.fieldType).Contains('*')) then
           Add('        jobject key = (*iter)->toJObject(env);')
         else if (TTypeConvert.KTypeToCType(AType.fieldType) = 'string') then
           Add('        jstring key = env->NewStringUTF((*iter).data());')
-        else
-          Add(Format('        j%s key = (j%s) (*iter);', [TTypeConvert.KTypeToJNIType(AType.fieldType), TTypeConvert.KTypeToJNIType(AType.fieldType)]));
+        else begin
+          Add(Format('        jobject key = env->NewObject(clsType, mConstructor, (j%s) (*iter));', [TTypeConvert.KTypeToJNIType(AType.fieldType)]));
+        end;
         Add('        env->CallBooleanMethod(ret, mAdd, key);');
         Add('    }');
         Add('    return ret;');
@@ -293,13 +352,8 @@ begin
   for i := 0 to AFieldList.Count - 1 do begin
     if (AFieldList[i].isArray) then begin
       r += Format('%s_arrayToJArray(env, %s), ', [AFieldList[i].fieldName, AFieldList[i].fieldName]);
-      if (TTypeConvert.KTypeToCType(AFieldList[i].baseType.fieldType).Contains('*')) or (TTypeConvert.KTypeToCType(AFieldList[i].baseType.fieldType) = 'string') then begin
-        methodList.Add(Format('jobjectArray %s_arrayToJArray(JNIEnv* env, %s (&dest)[%d])', [
-          AFieldList[i].fieldName, TTypeConvert.KTypeToCType(AFieldList[i].baseType.fieldType), AMaxArraySize]), AFieldList[i]);
-      end else begin
-        methodList.Add(Format('j%sArray %s_arrayToJArray(JNIEnv* env, %s (&dest)[%d])', [
-          TTypeConvert.KTypeToJNIType(AFieldList[i].baseType.fieldType), AFieldList[i].fieldName, TTypeConvert.KTypeToCType(AFieldList[i].baseType.fieldType), AMaxArraySize]), AFieldList[i]);
-      end;
+      methodList.Add(Format('jobjectArray %s_arrayToJArray(JNIEnv* env, %s (&dest)[%d])', [
+        AFieldList[i].fieldName, TTypeConvert.KTypeToCType(AFieldList[i].baseType.fieldType), AMaxArraySize]), AFieldList[i]);
     end else if (AFieldList[i].isList) then begin
       r += Format('%s_listToJArrayList(env, %s), ', [AFieldList[i].fieldName, AFieldList[i].fieldName]);
       methodList.Add(Format('jobject %s_listToJArrayList(JNIEnv *env, list<%s> &lst)', [
@@ -345,7 +399,6 @@ begin
     Add(Format('        jclass cls = env->FindClass("%s");', [AClassInfo.fullPackageName.Replace('.', '/', [rfIgnoreCase, rfReplaceAll])]));
     for i := 0 to AClassInfo.fieldList.Count - 1 do begin
       if (i = 0) then begin
-
         Add(Format('        jmethodID m = env->GetMethodID(cls, "%s", "()%s");', [
           TTypeConvert.KFieldToGetName(AClassInfo.fieldList[i].fieldName),
           AClassInfo.fieldList[i].baseType.fieldSignature]));
@@ -353,6 +406,7 @@ begin
         Add(Format('        m = env->GetMethodID(cls, "%s", "()%s");', [
           TTypeConvert.KFieldToGetName(AClassInfo.fieldList[i].fieldName),
           AClassInfo.fieldList[i].baseType.fieldSignature]));
+        WriteLn('AClassInfo:' + AClassInfo.fieldList[i].baseType.fieldSignature);
       end;
       callType:= TTypeConvert.KTypeToCallMethod(AClassInfo.fieldList[i].baseType.fieldType);
       if (callType.Contains('Object')) then begin

@@ -72,20 +72,23 @@ type
 
     // jni
     class function KTypeToJNIType(AType: string): string;
+    class function KTypeToJObjectType(AType: string): string;
+    class function KTypeToJObjectGetName(AType: string): string;
+    class function KTypeToJObjectGetSig(AType: string): string;
+    class function KTypeToJObjectConstructorSig(AType: string): string;
 
     // common
+    class function KTypeIsBasicType(AType: string): Boolean;
     class function KTypeToCallMethod(AType: string): string;
-
     class function ToFirstUpper(AField: string): string;
 
     // cpp
     class function KTypeToCType(AType: string): string;
-    class function KTypeToCMapType(AType: string): string;
-    class procedure KTypeExtractCMapTypes(AType: string; out p1: string; out p2: string);
-    class function KTypeToPType(AType: string): string;
-
     class function KFieldToGetName(AField: string): string;
     class function KFieldToSetName(AField: string): string;
+
+    // pas
+    class function KTypeToPType(AType: string): string;
 
   end;
 
@@ -215,6 +218,82 @@ begin
   Exit(r);
 end;
 
+class function TTypeConvert.KTypeToJObjectType(AType: string): string;
+var
+  r: string = '';
+begin
+  if (AType = 'Int') then r := 'java.lang.Integer';
+  if (AType = 'Double') then r := 'java.lang.Double';
+  if (AType = 'Boolean') then r := 'java.lang.Boolean';
+  if (AType = 'Byte') then r := 'java.lang.Byte';
+  if (AType = 'Char') then r := 'java.lang.Character';
+  if (AType = 'Short') then r := 'java.lang.Short';
+  if (AType = 'Long') then r := 'java.lang.Long';
+  if (AType = 'Float') then r := 'java.lang.Float';
+  if (r = '') then r := AType;
+  Exit(r);
+end;
+
+class function TTypeConvert.KTypeToJObjectGetName(AType: string): string;
+var
+  r: string = '';
+begin
+  if (AType = 'Int') then r := 'intValue';
+  if (AType = 'Double') then r := 'doubleValue';
+  if (AType = 'Boolean') then r := 'booleanValue';
+  if (AType = 'Byte') then r := 'byteValue';
+  if (AType = 'Char') then r := 'charValue';
+  if (AType = 'Short') then r := 'shortValue';
+  if (AType = 'Long') then r := 'longValue';
+  if (AType = 'Float') then r := 'floatValue';
+  Exit(r);
+end;
+
+class function TTypeConvert.KTypeToJObjectGetSig(AType: string): string;
+var
+  r: string = '';
+begin
+  if (AType = 'Int') then r := '()I';
+  if (AType = 'Double') then r := '()D';
+  if (AType = 'Boolean') then r := '()Z';
+  if (AType = 'Byte') then r := '()B';
+  if (AType = 'Char') then r := '()C';
+  if (AType = 'Short') then r := '()S';
+  if (AType = 'Long') then r := '()J';
+  if (AType = 'Float') then r := '()F';
+  Exit(r);
+end;
+
+class function TTypeConvert.KTypeToJObjectConstructorSig(AType: string): string;
+var
+  r: string = '';
+begin
+  if (AType = 'Int') then r := '(I)V';
+  if (AType = 'Double') then r := '(D)V';
+  if (AType = 'Boolean') then r := '(Z)V';
+  if (AType = 'Byte') then r := '(B)V';
+  if (AType = 'Char') then r := '(C)V';
+  if (AType = 'Short') then r := '(S)V';
+  if (AType = 'Long') then r := '(J)V';
+  if (AType = 'Float') then r := '(F)V';
+  Exit(r);
+end;
+
+class function TTypeConvert.KTypeIsBasicType(AType: string): Boolean;
+var
+  r: Boolean = False;
+begin
+  if (AType = 'Int') then r := True;
+  if (AType = 'Double') then r := True;
+  if (AType = 'Boolean') then r := True;
+  if (AType = 'Byte') then r := True;
+  if (AType = 'Char') then r := True;
+  if (AType = 'Short') then r := True;
+  if (AType = 'Long') then r := True;
+  if (AType = 'Float') then r := True;
+  Exit(r);
+end;
+
 class function TTypeConvert.KTypeToCType(AType: string): string;
 const
   HEAD_ARRAY = 'Array<';
@@ -239,30 +318,6 @@ begin
   if (AType = 'String') then r := 'string';
   if (r = '') then r := AType + '*';
   Exit(r);
-end;
-
-class function TTypeConvert.KTypeToCMapType(AType: string): string;
-var
-  arr: TStringArray;
-  p1: string;
-  p2: string;
-begin
-  AType:= AType.Substring(AType.IndexOf('<')).Trim.Trim(['<', '>']);
-  arr := AType.Split([',']);
-  p1 := KTypeToCType(arr[0].Trim);
-  p2 := KTypeToCType(arr[1].Trim);
-  Exit(Format('%s, %s', [p1, p2]));
-end;
-
-class procedure TTypeConvert.KTypeExtractCMapTypes(AType: string; out
-  p1: string; out p2: string);
-var
-  arr: TStringArray;
-begin
-  AType:= AType.Substring(AType.IndexOf('<')).Trim.Trim(['<', '>']);
-  arr := AType.Split([',']);
-  p1 := KTypeToCType(arr[0].Trim);
-  p2 := KTypeToCType(arr[1].Trim);
 end;
 
 class function TTypeConvert.KTypeToPType(AType: string): string;
@@ -314,3 +369,4 @@ begin
 end;
 
 end.
+

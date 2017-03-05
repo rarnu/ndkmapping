@@ -1,5 +1,5 @@
 #fpc
-
+ppas.sh
 *.ppu
 *.o
 *.lpi

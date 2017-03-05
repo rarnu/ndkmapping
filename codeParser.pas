@@ -107,55 +107,53 @@ begin
     if (isList) then begin
       // list
       baseType := TFieldType.Create;
-      baseType.fieldType:= 'ArrayList';
-      baseType.fieldFullPackageName:= 'java.util.ArrayList';
+      baseType.fieldType:= 'List';
+      baseType.fieldFullPackageName:= 'java.util.List';
       baseType.fieldPackageName:= 'java.util';
-      baseType.fieldSignature:= 'Ljava/util/ArrayList;';
+      baseType.fieldSignature:= 'Ljava/util/List;';
       baseType.fieldCategory:= ftcObject;
       // generic
       genericType1 := TFieldType.Create;
       genericType1.fieldType:= TTypeConvert.KTypeToSimpleKType(AFieldType);
-      genericType1.fieldFullPackageName:= typeToFullPackageName(TTypeConvert.KTypeToSimpleKType(AFieldType), ABasePath, ktClassCode, APkgName);
+      genericType1.fieldFullPackageName:= TTypeConvert.KTypeToJObjectType(typeToFullPackageName(TTypeConvert.KTypeToSimpleKType(AFieldType), ABasePath, ktClassCode, APkgName));
       genericType1.fieldPackageName:= typeExtractPackageName(genericType1.fieldFullPackageName);
       genericType1.fieldSignature:= typeToSig(genericType1.fieldFullPackageName);
       genericType1.fieldCategory:= typeToCategory(TTypeConvert.KTypeToSimpleKType(AFieldType));
     end else if (isMap) then begin
       // map
       baseType := TFieldType.Create;
-      baseType.fieldType:= 'HashMap';
-      baseType.fieldFullPackageName:= 'java.util.HashMap';
+      baseType.fieldType:= 'Map';
+      baseType.fieldFullPackageName:= 'java.util.Map';
       baseType.fieldPackageName:= 'java.util';
-      baseType.fieldSignature:= 'Ljava/util/HashMap;';
+      baseType.fieldSignature:= 'Ljava/util/Map;';
       baseType.fieldCategory:= ftcObject;
 
       TTypeConvert.KTypeExtractMapKTypes(AFieldType, mp1, mp2);
       genericType1 := TFieldType.Create;
       genericType1.fieldType:= TTypeConvert.KTypeToSimpleKType(mp1);
-      genericType1.fieldFullPackageName:= typeToFullPackageName(TTypeConvert.KTypeToSimpleKType(mp1), ABasePath, ktClassCode, APkgName);
+      genericType1.fieldFullPackageName:= TTypeConvert.KTypeToJObjectType(typeToFullPackageName(TTypeConvert.KTypeToSimpleKType(mp1), ABasePath, ktClassCode, APkgName));
       genericType1.fieldPackageName:= typeExtractPackageName(genericType1.fieldFullPackageName);
       genericType1.fieldSignature:= typeToSig(genericType1.fieldFullPackageName);
       genericType1.fieldCategory:= typeToCategory(TTypeConvert.KTypeToSimpleKType(mp1));
 
       genericType2 := TFieldType.Create;
       genericType2.fieldType:= TTypeConvert.KTypeToSimpleKType(mp2);
-      genericType2.fieldFullPackageName:= typeToFullPackageName(TTypeConvert.KTypeToSimpleKType(mp2), ABasePath, ktClassCode, APkgName);
+      genericType2.fieldFullPackageName:= TTypeConvert.KTypeToJObjectType(typeToFullPackageName(TTypeConvert.KTypeToSimpleKType(mp2), ABasePath, ktClassCode, APkgName));
       genericType2.fieldPackageName:= typeExtractPackageName(genericType2.fieldFullPackageName);
       genericType2.fieldSignature:= typeToSig(genericType2.fieldFullPackageName);
       genericType2.fieldCategory:= typeToCategory(TTypeConvert.KTypeToSimpleKType(mp2));
-
-
     end else if (isSet) then begin
       // set
       baseType := TFieldType.Create;
-      baseType.fieldType:= 'HashSet';
-      baseType.fieldFullPackageName:= 'java.util.HashSet';
+      baseType.fieldType:= 'Set';
+      baseType.fieldFullPackageName:= 'java.util.Set';
       baseType.fieldPackageName:= 'java.util';
-      baseType.fieldSignature:= 'Ljava/util/HashSet;';
+      baseType.fieldSignature:= 'Ljava/util/Set;';
       baseType.fieldCategory:= ftcObject;
       // generic
       genericType1 := TFieldType.Create;
       genericType1.fieldType:= TTypeConvert.KTypeToSimpleKType(AFieldType);
-      genericType1.fieldFullPackageName:= typeToFullPackageName(TTypeConvert.KTypeToSimpleKType(AFieldType), ABasePath, ktClassCode, APkgName);
+      genericType1.fieldFullPackageName:= TTypeConvert.KTypeToJObjectType(typeToFullPackageName(TTypeConvert.KTypeToSimpleKType(AFieldType), ABasePath, ktClassCode, APkgName));
       genericType1.fieldPackageName:= typeExtractPackageName(genericType1.fieldFullPackageName);
       genericType1.fieldSignature:= typeToSig(genericType1.fieldFullPackageName);
       genericType1.fieldCategory:= typeToCategory(TTypeConvert.KTypeToSimpleKType(AFieldType));
@@ -163,7 +161,7 @@ begin
       // array
       baseType := TFieldType.Create;
       baseType.fieldType:= TTypeConvert.KTypeToSimpleKType(AFieldType);
-      baseType.fieldFullPackageName:= typeToFullPackageName(TTypeConvert.KTypeToSimpleKType(AFieldType), ABasePath, ktClassCode, APkgName);
+      baseType.fieldFullPackageName:= TTypeConvert.KTypeToJObjectType(typeToFullPackageName(TTypeConvert.KTypeToSimpleKType(AFieldType), ABasePath, ktClassCode, APkgName));
       baseType.fieldPackageName:= typeExtractPackageName(baseType.fieldFullPackageName);
       baseType.fieldSignature:= '[' + typeToSig(baseType.fieldFullPackageName);
       baseType.fieldCategory:= typeToCategory(TTypeConvert.KTypeToSimpleKType(AFieldType));
