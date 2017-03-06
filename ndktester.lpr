@@ -23,18 +23,22 @@ type
 procedure TNDKTester.DoRun;
 var
   lng: string = ''; // language
+  lngx: string = ''; // language x
   bld: string = ''; // build options
+  pkg: string = ''; // pacakge name
   cpPath: string = ''; // copy path
   outPath: string = ''; // output path
   mainDir: string = '';  // kotlin file dir
 begin
   if (HasOption('l')) then lng := GetOptionValue('l');
+  if (HasOption('x')) then lngx:= GetOptionValue('x');
   if (HasOption('b')) then bld := GetOptionValue('b');
+  if (HasOption('p')) then pkg:= GetOptionValue('p');
   if (HasOption('c')) then cpPath:= GetOptionValue('c');
   if (HasOption('o')) then outPath:= GetOptionValue('o');
   mainDir:= ParamStr(ParamCount);
 
-  if (lng = '') or (outPath = '') or (mainDir = '') or (not DirectoryExists(mainDir)) then begin
+  if (lng = '') or (lngx = '') or (pkg = '') or (outPath = '') or (mainDir = '') or (not DirectoryExists(mainDir)) then begin
     WriteHelp;
     Terminate;
     Exit;
@@ -43,6 +47,12 @@ begin
   if (not mainDir.EndsWith('/')) then mainDir += '/';
 
   if (lng <> 'java') and (lng <> 'kotlin')  then begin
+    WriteHelp;
+    Terminate;
+    Exit;
+  end;
+
+  if (lngx <> 'cpp') and (lngx <> 'pas') then begin
     WriteHelp;
     Terminate;
     Exit;
@@ -77,10 +87,19 @@ begin
 
   // generate test api
   if (not outPath.EndsWith('/')) then outPath += '/';
-  TTestGenerator.generateDir(lng, outPath, mainDir);
+  if (not cpPath.EndsWith('/')) then cpPath += '/';
 
-  if (bld.Contains('mk')) then TTestGenerator.injectMakefile(lng, outPath);
-  if (bld = 'mkshcp') then TTestGenerator.injectShellCopy(lng, outPath, cpPath);
+  if (lng = 'java') then DeleteFile(outPath + 'JNITest.java');
+  if (lng = 'kotlin') then DeleteFile(outPath + 'JNITest.kt');
+  if (lngx = 'cpp') then begin
+    DeleteFile(outPath + 'JNITest.h');
+    DeleteFile(outPath + 'JNITest.cpp');
+  end;
+  if (lngx = 'pas') then DeleteFile(outPath + 'JNITest.pas');
+  TTestGenerator.generateDir(lng, lngx, pkg, outPath, mainDir);
+
+  if (bld.Contains('mk')) then TTestGenerator.injectMakefile(lngx, outPath);
+  if (bld = 'mkshcp') then TTestGenerator.injectShellCopy(lngx, outPath, cpPath);
 
   Terminate;
 end;
@@ -106,12 +125,14 @@ begin
   WriteLn('');
   WriteLn('  options:');
   WriteLn('    -l language (java, kotlin)');
+  WriteLn('    -x exported JNI code language (cpp, pas)');
   WriteLn('    -b build option (mk, mkshcp)');
+  WriteLn('    -p base package name');
   WriteLn('    -c copy path');
   WriteLn('    -o output path');
   WriteLn('sample:');
   WriteLn('');
-  WriteLn('    ndktester -l kotlin -b mkshcp -c ./jniLibs/ -o ./out/ ./kotlin/');
+  WriteLn('    ndktester -l kotlin -x cpp -b mkshcp -p com.sample.ndk -c ./jniLibs/ -o ./out/ ./kotlin/');
   WriteLn('');
 end;
 
