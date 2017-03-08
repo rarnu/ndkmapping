@@ -321,9 +321,18 @@ begin
 end;
 
 class function TTypeConvert.KTypeToPType(AType: string): string;
+const
+  HEAD_ARRAY = 'Array<';
+  HEAD_LIST = 'List<';
+  HEAD_MAP = 'Map<';
+  HEAD_SET = 'Set<';
 var
   r: string = '';
 begin
+  if (AType.StartsWith(HEAD_ARRAY)) then AType:= AType.Replace(HEAD_ARRAY, '', [rfIgnoreCase, rfReplaceAll]).Trim.Trim(['>']);
+  if (AType.Contains(HEAD_LIST)) then AType:= AType.Substring(AType.IndexOf(HEAD_LIST) + HEAD_LIST.Length).Trim.Trim(['>']);
+  if (AType.Contains(HEAD_MAP)) then AType:= AType.Substring(AType.IndexOf(HEAD_MAP) + HEAD_MAP.Length).Trim.Trim(['>']);
+  if (AType.Contains(HEAD_SET)) then AType:= AType.Substring(AType.IndexOf(HEAD_SET) + HEAD_SET.Length).Trim.Trim(['>']);
   if (AType = 'Int') then r := 'Integer';
   if (AType = 'Double') then r := 'Double';
   if (AType = 'Boolean') then r := 'Boolean';
@@ -333,7 +342,7 @@ begin
   if (AType = 'Long') then r := 'Int64';
   if (AType = 'Float') then r := 'Extended';
   if (AType = 'String') then r := 'String';
-  if (r = '') then r := AType;
+  if (r = '') then r := 'T' + AType;
   Exit(r);
 end;
 

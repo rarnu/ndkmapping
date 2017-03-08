@@ -406,7 +406,6 @@ begin
         Add(Format('        m = env->GetMethodID(cls, "%s", "()%s");', [
           TTypeConvert.KFieldToGetName(AClassInfo.fieldList[i].fieldName),
           AClassInfo.fieldList[i].baseType.fieldSignature]));
-        WriteLn('AClassInfo:' + AClassInfo.fieldList[i].baseType.fieldSignature);
       end;
       callType:= TTypeConvert.KTypeToCallMethod(AClassInfo.fieldList[i].baseType.fieldType);
       if (callType.Contains('Object')) then begin

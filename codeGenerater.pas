@@ -99,6 +99,52 @@ begin
     sl.SaveToFile(AOutPath + 'Application.mk');
     sl.Free;
 
+  end else if (ALanguage = 'pas') then begin
+    // TODO: pas make
+    sl := TStringList.Create;
+    sl.Add('#!/bin/sh');
+    sl.Add('ROOT_PATH=/usr/local/codetyphon');
+    sl.Add('TYPHON_PATH=${ROOT_PATH}/typhon');
+    sl.Add('TYPHON_BIN_LIB=${ROOT_PATH}/binLibraries');
+    sl.Add('FPC=/usr/local/codetyphon/fpc/fpc64/bin/x86_64-linux/fpc');
+    sl.Add('');
+    sl.Add('if [ ! -d "lib" ]; then');
+    sl.Add('    mkdir lib');
+    sl.Add('fi');
+    sl.Add('if [ ! -d "out" ]; then');
+    sl.Add('    mkdir out');
+    sl.Add('fi');
+    sl.Add('');
+    sl.Add('__compile() {');
+
+    sl.Add('}');
+
+    (*
+
+        CPU=$1
+        LIB=$2
+        PROJ=$3
+        rm -fr lib/${LIB}-android/*
+        mkdir lib/${LIB}-android/
+        if [ ! -d "out/${LIB}" ]; then
+                mkdir out/${LIB}
+        fi
+        ${FPC} -B -Tandroid -P${CPU} \
+        -MObjFPC -Scghi -Cg -O1 -l -vewnhibq \
+        -Filib/${LIB}-android \
+        -Fl${TYPHON_BIN_LIB}/android-5.0-api21-${LIB} \
+        -Fu. -FUlib/${LIB}-android \
+        -oout/${LIB}/librarnu${PROJ}.so \
+        ${PROJ}.lpr
+
+
+__compile "arm" "arm" "cmd"
+__compile "i386" "i386" "cmd"
+__compile "mipsel" "mips" "cmd"
+    *)
+
+    sl.SaveToFile(AOutPath + 'build.sh');
+    sl.Free;
   end;
 end;
 
@@ -119,6 +165,8 @@ begin
     sl.Add('fi');
     sl.SaveToFile(AOutPath + 'build.sh');
     sl.Free;
+  end else if (ALanguage = 'pas') then begin
+    // TODO: pas shell
   end;
 end;
 
