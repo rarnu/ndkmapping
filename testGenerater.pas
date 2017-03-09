@@ -80,6 +80,7 @@ class procedure TTestGenerator.injectMakefile(ALanguage: string;
   AOutPath: string);
 var
   path: string;
+  src: TSearchRec;
   idx: Integer = 0;
 begin
   if (ALanguage = 'cpp') then begin
@@ -102,7 +103,42 @@ begin
       end;
     end;
   end else if (ALanguage = 'pas') then begin
-    // TODO: inject pas makefile
+    // inject pas makefile
+    path := AOutPath + 'build_test.sh';
+    with TStringList.Create do begin
+      Add('#!/bin/sh');
+      Add('ROOT_PATH=/usr/local/codetyphon');
+      Add('TYPHON_PATH=${ROOT_PATH}/typhon');
+      Add('TYPHON_BIN_LIB=${ROOT_PATH}/binLibraries');
+      Add('ANDROID_API=android-5.0-api21');
+      Add('FPC=/usr/local/codetyphon/fpc/fpc64/bin/x86_64-linux/fpc');
+      Add('if [ ! -d "lib" ]; then');
+      Add('    mkdir lib');
+      Add('fi');
+      Add('if [ ! -d "out" ]; then');
+      Add('    mkdir out');
+      Add('fi');
+      Add('__compile() {');
+      Add('    CPU=$1');
+      Add('    LIB=$2');
+      Add('    rm -fr lib/${LIB}-android/*');
+      Add('    mkdir lib/${LIB}-android/');
+      Add('    if [ ! -d "out/${LIB}" ]; then');
+      Add('        mkdir out/${LIB}');
+      Add('    fi');
+      Add('    ${FPC} -B -Tandroid -P${CPU} -MObjFPC -Scghi -Cg -O1 -l -vewnhibq \');
+      Add('        -Filib/${LIB}-android -FUlib/${LIB}-android \');
+      Add('        -Fl${TYPHON_BIN_LIB}/${ANDROID_API}-${LIB} \');
+      Add('        -Fu. \');
+      Add('        -oout/${LIB}/libjnitest.so \');
+      Add('        JNITest.pas');
+      Add('}');
+      Add('__compile "arm" "arm"');
+      Add('__compile "i386" "i386"');
+      Add('');
+      SaveToFile(path);
+      Free;
+    end;
   end;
 end;
 
@@ -124,7 +160,20 @@ begin
       end;
     end;
   end else if (ALanguage = 'pas') then begin
-    // TODO: inject shell script
+    // inject shell script
+    path := AOutPath + 'build_test.sh';
+    if (FileExists(path)) then begin
+      with TStringList.Create do begin
+        LoadFromFile(path);
+        Add('mv out/arm out/armeabi');
+        Add('mv out/i386 out/x86');
+        Add('cp -fr out/armeabi out/armeabi-v7a');
+        cpCmd:= Format('cp -fr out/* %s', [ACpPath]);
+        Add(cpCmd);
+        SaveToFile(path);
+        Free;
+      end;
+    end;
   end;
 end;
 

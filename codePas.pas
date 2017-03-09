@@ -555,7 +555,7 @@ begin
           if (TTypeConvert.KTypeToPType(AClassInfo.fieldList[i].baseType.fieldType) = 'String') then begin
             Add(Format('    Result.%s := TJniEnv.JStringToString(env, env^^.CallObjectMethod(env, obj, m));', [AClassInfo.fieldList[i].fieldName]));
           end else begin
-            Add(Format('    Result.%s := T%s::fromJObject(env, env^^.CallObjectMethod(env, obj, m));', [
+            Add(Format('    Result.%s := T%s.fromJObject(env, env^^.CallObjectMethod(env, obj, m));', [
               AClassInfo.fieldList[i].fieldName, AClassInfo.fieldList[i].baseType.fieldType]));
           end;
         end;
