@@ -80,7 +80,6 @@ class procedure TTestGenerator.injectMakefile(ALanguage: string;
   AOutPath: string);
 var
   path: string;
-  src: TSearchRec;
   idx: Integer = 0;
 begin
   if (ALanguage = 'cpp') then begin

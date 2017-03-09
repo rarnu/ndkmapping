@@ -97,7 +97,6 @@ begin
   end;
   if (lngx = 'pas') then DeleteFile(outPath + 'JNITest.pas');
   TTestGenerator.generateDir(lng, lngx, pkg, outPath, mainDir);
-
   if (bld.Contains('mk')) then TTestGenerator.injectMakefile(lngx, outPath);
   if (bld = 'mkshcp') then TTestGenerator.injectShellCopy(lngx, outPath, cpPath);
 

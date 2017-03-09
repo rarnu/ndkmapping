@@ -65,10 +65,8 @@ begin
     Add('');
     Add('{$mode objfpc}{$H+}');
     Add('');
-    Add('interface');
-    Add('');
     Add('uses');
-    Add('  cthreads, Classes, SysUtils, Jni2;');
+    Add('  cthreads, Classes, SysUtils, JNI2;');
     Add('');
     Add('');
     Add('exports');
